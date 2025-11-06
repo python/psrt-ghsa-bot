@@ -23,12 +23,12 @@ class GitHubPlaywrightClient:
     """
 
     def __init__(
-            self,
-            headless: bool = True,
-            auth_token: str | None = None,
-            storage_state_path: str | None = None,
-            slow_mo: int = 0,
-            record_video: bool = False,
+        self,
+        headless: bool = True,
+        auth_token: str | None = None,
+        storage_state_path: str | None = None,
+        slow_mo: int = 0,
+        record_video: bool = False,
     ) -> None:
         """Initialize the GitHub Playwright client.
 
@@ -71,11 +71,11 @@ class GitHubPlaywrightClient:
         )
 
         storage_state_file = Path(self.storage_state_path)
-        storage_state = None
+        storage_state: str | None = None
         if storage_state_file.exists():
             storage_state = str(storage_state_file)
 
-        context_options = {"storage_state": storage_state}
+        context_options: dict[str, Any] = {"storage_state": storage_state}
         if self.record_video:
             context_options["record_video_dir"] = "playwright-videos/"
 
@@ -286,7 +286,11 @@ class GitHubPlaywrightClient:
     def wait_for_page_ready(self, timeout: int = 30000) -> None:
         """Wait for the page to be fully loaded and interactive.
 
+        Uses domcontentloaded instead of networkidle because GitHub pages
+        maintain WebSocket connections for live updates which prevent
+        networkidle from ever being reached.
+
         Args:
             timeout: Maximum time to wait in milliseconds
         """
-        self.page.wait_for_load_state("networkidle", timeout=timeout)
+        self.page.wait_for_load_state("domcontentloaded", timeout=timeout)
