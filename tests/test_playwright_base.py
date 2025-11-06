@@ -1,6 +1,5 @@
 """Tests for the Playwright base client."""
 
-import os
 from pathlib import Path
 
 import pytest
@@ -88,16 +87,18 @@ def test_wait_for_page_ready(client: GitHubPlaywrightClient):
         client.wait_for_page_ready(timeout=10000)
 
 
-@pytest.mark.skip(reason="Manual test - run explicitly with: pytest tests/test_playwright_base.py::test_manual_authentication -v")
+@pytest.mark.skip(
+    reason="Manual test - run explicitly with: pytest tests/test_playwright_base.py::test_manual_authentication -v"
+)
 def test_manual_authentication():
     """Test manual authentication flow.
 
-    This test is marked as manual and should be run explicitly when needed
-    to set up initial authentication.
-/
-    Only really for localdev bcecause we want CI to be automagic ✨ so use PAT for that
+        This test is marked as manual and should be run explicitly when needed
+        to set up initial authentication.
+    /
+        Only really for localdev bcecause we want CI to be automagic ✨ so use PAT for that
 
-    Run with: pytest tests/test_playwright_base.py::test_manual_authentication -v
+        Run with: pytest tests/test_playwright_base.py::test_manual_authentication -v
     """
     with GitHubPlaywrightClient(headless=False) as client:
         client.authenticate_manual(timeout=120000)  # 2 minutes
