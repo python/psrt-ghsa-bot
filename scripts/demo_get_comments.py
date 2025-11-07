@@ -49,7 +49,7 @@ Example:
 
 import argparse
 
-from psrt_ghsa_bot.github_polyfills import GitHubPlaywrightClient, get_ghsa_comments
+from psrt_ghsa_bot.polyfills import GitHubPlaywrightClient, get_ghsa_comments
 
 
 def main():

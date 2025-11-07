@@ -1,12 +1,19 @@
-"""Tests for GHSA comment reading functionality."""
+"""Tests for GHSA comment functionality (reading and writing)."""
 
+import os
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 
 import pytest
+from githubkit import GitHub, TokenAuthStrategy
 
-from psrt_ghsa_bot.github_polyfills import GHSAComment, GitHubPlaywrightClient, get_ghsa_comments
+from psrt_ghsa_bot.polyfills import (
+    GHSAComment,
+    GitHubPlaywrightClient,
+    get_ghsa_comments,
+    post_ghsa_comment,
+)
 
 
 @pytest.fixture
@@ -17,6 +24,54 @@ def authenticated_client() -> Generator[GitHubPlaywrightClient, None, None]:
     client.authenticate()
     yield client
     client.close()
+
+
+@pytest.fixture
+def test_ghsa() -> Generator[dict[str, str], None, None]:
+    """Create a test GHSA and clean it up after the test.
+
+    Returns dict with: owner, repo, ghsa_id
+    """
+    token = os.getenv("GH_AUTH_TOKEN")
+    if not token:
+        pytest.skip("GH_AUTH_TOKEN not set")
+
+    github = GitHub(TokenAuthStrategy(token))  # type: ignore[arg-type]
+    owner = "jolt-org"
+    repo = "ghsa-testing"
+
+    # Create a test advisory
+    response = github.rest.security_advisories.create_repository_advisory(
+        owner=owner,
+        repo=repo,
+        data={
+            "summary": f"Test Advisory {datetime.now().timestamp()}",
+            "description": "This is a test advisory created by pytest. It will be deleted automatically.",
+            "severity": "low",
+            "vulnerabilities": [
+                {
+                    "package": {"ecosystem": "pip", "name": "test-package"},
+                    "vulnerable_version_range": "< 1.0.0",
+                }
+            ],
+        },
+    )
+
+    ghsa_id = response.parsed_data.ghsa_id
+
+    yield {"owner": owner, "repo": repo, "ghsa_id": ghsa_id}
+
+    # Cleanup: Close/delete the advisory
+    # Note: GitHub doesn't allow deleting advisories via API, but we can close them
+    try:
+        github.rest.security_advisories.update_repository_advisory(
+            owner=owner,
+            repo=repo,
+            ghsa_id=ghsa_id,
+            data={"state": "closed"},
+        )
+    except Exception:
+        pass  # Best effort cleanup
 
 
 @pytest.mark.skip(reason="idk how to test this actually")
@@ -110,9 +165,7 @@ def test_get_ghsa_comments_bot_detection(authenticated_client: GitHubPlaywrightC
     bot_comments = [c for c in comments if c.is_bot_comment]
     [c for c in comments if not c.is_bot_comment]
 
-    # Verify bot detection works (if any bot comments exist)
     for bot_comment in bot_comments:
-        # Bot usernames typically contain "bot"
         assert "bot" in bot_comment.author.lower() or "[bot]" in bot_comment.author
 
 
@@ -199,3 +252,112 @@ def test_get_ghsa_comments_pagination():
 
         # Verify we got all comments, not just the first page
         assert len(comments) > 20
+
+
+# ============================================================================
+# POST COMMENT TESTS
+# ============================================================================
+
+
+@pytest.mark.skip(reason="Requires test GHSA creation (needs write permissions)")
+def test_post_ghsa_comment_basic(authenticated_client: GitHubPlaywrightClient, test_ghsa: dict[str, str]):
+    """Test basic comment posting to a GHSA."""
+    test_comment = f"Test comment from pytest at {datetime.now().isoformat()}"
+
+    comment_id = post_ghsa_comment(
+        authenticated_client,
+        owner=test_ghsa["owner"],
+        repo=test_ghsa["repo"],
+        ghsa_id=test_ghsa["ghsa_id"],
+        comment_body=test_comment,
+    )
+
+    assert isinstance(comment_id, str)
+    assert len(comment_id) > 0
+
+
+@pytest.mark.skipif(
+    not Path("playwright/.auth/github_state.json").exists(),
+    reason="Requires existing authentication state",
+)
+def test_post_and_read_comment_roundtrip(authenticated_client: GitHubPlaywrightClient):
+    """Test posting a comment and then reading it back."""
+    unique_text = f"Roundtrip test {datetime.now().timestamp()}"
+
+    # Post the comment
+    comment_id = post_ghsa_comment(
+        authenticated_client,
+        owner="jolt-org",
+        repo="ghsa-testing",
+        ghsa_id="GHSA-f3x5-4pp6-r2mf",
+        comment_body=unique_text,
+    )
+
+    assert comment_id is not None
+
+    # Read comments back
+    comments = get_ghsa_comments(
+        authenticated_client,
+        owner="jolt-org",
+        repo="ghsa-testing",
+        ghsa_id="GHSA-f3x5-4pp6-r2mf",
+    )
+
+    # Find our comment
+    posted_comment = next((c for c in comments if unique_text in c.body), None)
+    assert posted_comment is not None
+    assert posted_comment.body == unique_text
+
+
+def test_post_comment_empty_body_error():
+    """Test that posting an empty comment raises ValueError."""
+    with GitHubPlaywrightClient(headless=True) as client:
+        with pytest.raises(ValueError, match="comment_body cannot be empty"):
+            post_ghsa_comment(
+                client,
+                owner="jolt-org",
+                repo="ghsa-testing",
+                ghsa_id="GHSA-f3x5-4pp6-r2mf",
+                comment_body="",
+            )
+
+
+def test_post_comment_whitespace_only_error():
+    """Test that posting whitespace-only comment raises ValueError."""
+    with GitHubPlaywrightClient(headless=True) as client:
+        with pytest.raises(ValueError, match="comment_body cannot be empty"):
+            post_ghsa_comment(
+                client,
+                owner="jolt-org",
+                repo="ghsa-testing",
+                ghsa_id="GHSA-f3x5-4pp6-r2mf",
+                comment_body="   \n\t  ",
+            )
+
+
+@pytest.mark.skip(reason="Manual test - posts to real GHSA")
+def test_post_comment_with_markdown(authenticated_client: GitHubPlaywrightClient):
+    """Test posting a comment with markdown formatting."""
+    markdown_comment = f"""# Test Comment {datetime.now().timestamp()}
+
+This comment contains **bold**, *italic*, and `code`.
+
+- List item 1
+- List item 2
+
+```python
+def hello():
+    return "world"
+```
+"""
+
+    comment_id = post_ghsa_comment(
+        authenticated_client,
+        owner="jolt-org",
+        repo="ghsa-testing",
+        ghsa_id="GHSA-f3x5-4pp6-r2mf",
+        comment_body=markdown_comment,
+    )
+
+    assert isinstance(comment_id, str)
+    assert len(comment_id) > 0

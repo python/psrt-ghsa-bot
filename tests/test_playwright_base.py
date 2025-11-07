@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from psrt_ghsa_bot.github_polyfills.playwright_base import GitHubPlaywrightClient
+from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 
 
 @pytest.fixture

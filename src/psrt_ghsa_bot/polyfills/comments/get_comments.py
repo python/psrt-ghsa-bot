@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from playwright.sync_api import Locator, TimeoutError as PlaywrightTimeoutError
 
 if TYPE_CHECKING:
-    from .playwright_base import GitHubPlaywrightClient
+    from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 
 
 @dataclass
