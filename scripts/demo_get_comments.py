@@ -52,7 +52,7 @@ import argparse
 from psrt_ghsa_bot.polyfills import GitHubPlaywrightClient, get_ghsa_comments
 
 
-def main():
+def main() -> None:
     """Demonstrate reading GHSA comments."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Demo script for reading GHSA comments")
