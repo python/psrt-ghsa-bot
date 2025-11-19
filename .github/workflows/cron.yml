@@ -1,4 +1,4 @@
-name: "PSRT GHSA Bot"
+name: "PSRT GHSA Cron Bot"
 
 on:
   workflow_dispatch:

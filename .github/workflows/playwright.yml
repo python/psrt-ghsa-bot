@@ -1,0 +1,69 @@
+name: "PSRT GHSA Playwright Bot"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  process-comments:
+    runs-on: ubuntu-latest
+    name: "Process GHSA Comments"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --locked --no-editable --no-dev
+
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps chromium
+
+      - name: Restore state from cache
+        id: cache-state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: playwright-state-${{ github.run_id }}
+          restore-keys: |
+            playwright-state-
+
+      - name: Process comments
+        run: uv run python -m psrt_ghsa_bot.comment_processor
+        env:
+          GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
+          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+          GH_CLIENT_PRIVATE_KEY: ${{ secrets.GH_CLIENT_PRIVATE_KEY }}
+          CVE_USERNAME: ${{ vars.CVE_USERNAME }}
+          CVE_API_KEY: ${{ secrets.CVE_API_KEY }}
+          CVE_ENV: ${{ vars.CVE_ENV }}
+          GH_BOT_USERNAME: ${{ vars.GH_BOT_USERNAME }}
+          GH_BOT_PASSWORD: ${{ secrets.GH_BOT_PASSWORD }}
+          GH_BOT_OTP_SECRET: ${{ secrets.GH_BOT_OTP_SECRET }}
+
+      - name: Save state to cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: playwright-state-${{ github.run_id }}
+
+      - name: Commit state file
+        if: always()
+        run: |
+          git config user.name "PSRT-GHSA-Automation[bot]"
+          git config user.email "bot@python.org"
+          git add state.json
+          git diff --quiet || git commit -m "Update comment processing state [skip ci]"
+          git push || true
