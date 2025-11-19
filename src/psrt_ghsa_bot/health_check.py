@@ -51,6 +51,7 @@ def check_workflow_health() -> None:
                 "--limit",
                 "5",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
