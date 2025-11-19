@@ -69,6 +69,11 @@ def process_ghsa_comments(
         comment_id = comment.id
         author = comment.author
         body = comment.body
+
+        if author == playwright_client.username:
+            # don't actually wanna process our own comments :)
+            continue
+
         cmd = parse_command(body, author, comment_id, playwright_client.username, comment.created_at)
 
         if cmd is None:
