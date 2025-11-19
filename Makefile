@@ -14,7 +14,7 @@ lint:  ## Lint the code
 fmt:  ## Format the code
 	@uv run ruff format .
 
-mt-check:  ## Runs Ruff format in check mode (no changes)
+fmt-check:  ## Runs Ruff format in check mode (no changes)
 	@uv run --no-sync ruff format --check .
 
 type-check:  ## Run type-checking
