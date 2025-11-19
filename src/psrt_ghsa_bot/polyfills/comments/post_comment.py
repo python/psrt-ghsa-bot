@@ -48,15 +48,15 @@ def post_ghsa_comment(
         ...     print(f"Posted comment: {comment_id}")
     """
     if not comment_body or not comment_body.strip():
-        raise ValueError("comment_body cannot be empty")
+        msg = "comment_body cannot be empty"
+        raise ValueError(msg)
 
     client.navigate_to_ghsa(owner, repo, ghsa_id)
 
     _fill_comment_form(client, comment_body)
     _submit_comment(client)
 
-    comment_id = _wait_for_comment_posted(client, comment_body)
-    return comment_id
+    return _wait_for_comment_posted(client, comment_body)
 
 
 def _fill_comment_form(client: GitHubPlaywrightClient, comment_body: str) -> None:
@@ -75,10 +75,11 @@ def _fill_comment_form(client: GitHubPlaywrightClient, comment_body: str) -> Non
         textarea.click()
         textarea.fill(comment_body)
     except PlaywrightTimeoutError:
-        raise RuntimeError(
+        msg = (
             "Could not find comment textarea. The page structure may have changed, "
             "or you may not have permission to comment on this advisory."
         )
+        raise RuntimeError(msg)
 
 
 def _submit_comment(client: GitHubPlaywrightClient) -> None:
@@ -95,7 +96,8 @@ def _submit_comment(client: GitHubPlaywrightClient) -> None:
         submit_button.wait_for(state="visible", timeout=5000)
         submit_button.click()
     except PlaywrightTimeoutError:
-        raise RuntimeError("Could not find comment submit button. The page structure may have changed.")
+        msg = "Could not find comment submit button. The page structure may have changed."
+        raise RuntimeError(msg)
 
 
 def _wait_for_comment_posted(
@@ -133,13 +135,15 @@ def _wait_for_comment_posted(
             except Exception:
                 continue
 
-        raise RuntimeError(
+        msg = (
             f"Comment was submitted but could not be found on the page within {timeout}ms. "
             "It may have been posted successfully but not yet visible."
         )
+        raise RuntimeError(msg)
 
     except PlaywrightTimeoutError:
-        raise RuntimeError(
+        msg = (
             f"Comment was submitted but could not be found on the page within {timeout}ms. "
             "It may have been posted successfully but not yet visible."
         )
+        raise RuntimeError(msg)

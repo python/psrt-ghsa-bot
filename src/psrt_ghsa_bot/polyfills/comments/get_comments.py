@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from playwright.sync_api import Locator, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Locator
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 if TYPE_CHECKING:
     from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
@@ -30,18 +31,18 @@ class GHSAComment:
     updated_at: datetime
     """Timestamp when comment was last updated"""
     is_bot_comment: bool
-    """True if comment is from psrt-ghsabot or other bot account"""
+    """True if comment is from <bot-username> or other bot account"""
 
     def __repr__(self) -> str:
-        """for debugging."""
+        """For debugging."""
         return f"GHSAComment(id={self.id}, author={self.author}, created={self.created_at})"
 
 
 def get_ghsa_comments(
-    client: "GitHubPlaywrightClient",
+    client: GitHubPlaywrightClient,
     owner: str,
     repo: str,
-    ghsa_id: str,
+    ghsa_id: str,    debug: bool = False,
 ) -> list[GHSAComment]:
     """Get all comments from a GitHub Security Advisory using Playwright.
 
@@ -53,6 +54,7 @@ def get_ghsa_comments(
         owner: Repository owner (organization or user)
         repo: Repository name
         ghsa_id: GHSA identifier (e.g., GHSA-xxxx-xxxx-xxxx)
+        debug: Enable debug output
 
     Returns:
         List of GHSAComment objects in chronological order
@@ -71,12 +73,10 @@ def get_ghsa_comments(
     client.navigate_to_ghsa(owner, repo, ghsa_id)
 
     _load_all_comments(client)
-    comments = _extract_comments(client)
-
-    return comments
+    return _extract_comments(client, debug=debug)
 
 
-def _load_all_comments(client: "GitHubPlaywrightClient") -> None:
+def _load_all_comments(client: GitHubPlaywrightClient) -> None:
     """Load all comments by clicking 'Load more' buttons until exhausted.
 
     GitHub may paginate comments with "Show more..." / "Load more" buttons.
@@ -117,13 +117,14 @@ def _load_all_comments(client: "GitHubPlaywrightClient") -> None:
             break
 
 
-def _extract_comments(client: "GitHubPlaywrightClient") -> list[GHSAComment]:
+def _extract_comments(client: GitHubPlaywrightClient, debug: bool = False) -> list[GHSAComment]:
     """Extract all comment data from the current page.
 
     Uses multiple fallback selectors to handle GitHub UI changes.
 
     Args:
         client: GitHubPlaywrightClient instance
+        debug: Enable debug output
 
     Returns:
         List of parsed GHSAComment objects
@@ -140,22 +141,34 @@ def _extract_comments(client: "GitHubPlaywrightClient") -> list[GHSAComment]:
     for selector in comment_selectors:
         try:
             elements = client.page.locator(selector).all()
+            if debug and elements:
+                print(f"\n         🔍 DEBUG: Found {len(elements)} elements with selector '{selector}'")
             if elements:
                 comment_elements = elements
                 break
-        except Exception:
+        except Exception as e:
+            if debug:
+                print(f"\n         🔍 DEBUG: Selector '{selector}' failed: {e}")
             continue
 
     if not comment_elements:
+        if debug:
+            print("\n         🔍 DEBUG: No comment elements found with any selector")
         return comments
+
+    if debug:
+        print(f"\n         🔍 DEBUG: Parsing {len(comment_elements)} comment elements")
 
     for idx, element in enumerate(comment_elements):
         try:
             comment = _parse_comment_element(element, idx)
             if comment:
                 comments.append(comment)
+                if debug:
+                    print(f"\n         🔍 DEBUG: Parsed comment from @{comment.author}: {comment.body[:30]}...")
         except Exception as e:
-            print(f"Warning: Failed to parse comment element {idx}: {e}")
+            if debug:
+                print(f"\n         🔍 DEBUG: Failed to parse element {idx}: {e}")
             continue
 
     return comments
@@ -264,7 +277,7 @@ def _extract_timestamp(element: Locator, timestamp_type: str) -> datetime:
             time_element = element.locator(selector).first
             datetime_str = time_element.get_attribute("datetime", timeout=1000)
             if datetime_str:
-                return datetime.fromisoformat(datetime_str.replace("Z", "+00:00"))
+                return datetime.fromisoformat(datetime_str)
         except Exception:
             continue
 

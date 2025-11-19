@@ -13,14 +13,14 @@ def client() -> GitHubPlaywrightClient:
     return GitHubPlaywrightClient(headless=True)
 
 
-def test_client_context_manager():
+def test_client_context_manager() -> None:
     """Test that the client works as a context manager."""
     with GitHubPlaywrightClient(headless=True) as client:
         assert client.page is not None
         assert client.context is not None
 
 
-def test_client_start_and_close(client: GitHubPlaywrightClient):
+def test_client_start_and_close(client: GitHubPlaywrightClient) -> None:
     """Test that the client can be started and closed manually."""
     client.start()
     assert client.page is not None
@@ -31,7 +31,7 @@ def test_client_start_and_close(client: GitHubPlaywrightClient):
         _ = client.page
 
 
-def test_navigate_to_public_page(client: GitHubPlaywrightClient):
+def test_navigate_to_public_page(client: GitHubPlaywrightClient) -> None:
     """Test navigation to a public GitHub page."""
     with client:
         client.page.goto("https://github.com")
@@ -42,7 +42,7 @@ def test_navigate_to_public_page(client: GitHubPlaywrightClient):
     not Path("playwright/.auth/github_state.json").exists(),
     reason="Requires existing auth state (PAT tokens don't work for web UI auth)",
 )
-def test_authentication_with_saved_state(client: GitHubPlaywrightClient):
+def test_authentication_with_saved_state(client: GitHubPlaywrightClient) -> None:
     """Test authentication using saved state from manual login."""
     with client:
         client.authenticate()
@@ -53,7 +53,7 @@ def test_authentication_with_saved_state(client: GitHubPlaywrightClient):
     not Path("playwright/.auth/github_state.json").exists(),
     reason="Requires existing authentication state",
 )
-def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient):
+def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient) -> None:
     """Test navigation to a GHSA page (requires authentication)."""
     with client:
         client.authenticate()
@@ -69,7 +69,7 @@ def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient):
     not Path("playwright/.auth/github_state.json").exists(),
     reason="Requires existing authentication state",
 )
-def test_authentication_state_persistence(client: GitHubPlaywrightClient):
+def test_authentication_state_persistence(client: GitHubPlaywrightClient) -> None:
     """Test that authentication state is saved and can be reused."""
     storage_state_path = Path("playwright/.auth/github_state.json")
 
@@ -80,7 +80,7 @@ def test_authentication_state_persistence(client: GitHubPlaywrightClient):
     assert storage_state_path.exists()
 
 
-def test_wait_for_page_ready(client: GitHubPlaywrightClient):
+def test_wait_for_page_ready(client: GitHubPlaywrightClient) -> None:
     """Test the wait_for_page_ready helper."""
     with client:
         client.page.goto("https://github.com")
@@ -90,7 +90,7 @@ def test_wait_for_page_ready(client: GitHubPlaywrightClient):
 @pytest.mark.skip(
     reason="Manual test - run explicitly with: pytest tests/test_playwright_base.py::test_manual_authentication -v"
 )
-def test_manual_authentication():
+def test_manual_authentication() -> None:
     """Test manual authentication flow.
 
         This test is marked as manual and should be run explicitly when needed

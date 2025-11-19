@@ -11,8 +11,6 @@ from githubkit import AppAuthStrategy, GitHub
 
 load_dotenv()
 
-if typing.TYPE_CHECKING:
-    pass
 
 PSRT_GITHUB_TEAM_SLUG = "psrt"
 
@@ -23,8 +21,9 @@ def get_repository_advisories(
     repo: str,
 ) -> typing.Iterable[dict[str, typing.Any]]:
     """Lists repository security advisories using the REST API."""
-    from githubkit.exception import RequestFailed
     import json
+
+    from githubkit.exception import RequestFailed
 
     try:
         # Use direct request instead of paginate to avoid validation issues
@@ -34,8 +33,7 @@ def get_repository_advisories(
         )
         # Parse JSON directly to bypass Pydantic validation
         advisories = json.loads(response.content)
-        for advisory in advisories:
-            yield advisory
+        yield from advisories
     except RequestFailed as e:
         # 404 means no advisories or no access - that's okay
         if e.response.status_code == 404:
@@ -44,7 +42,7 @@ def get_repository_advisories(
 
 
 def reserve_one_cve(cve_api: CveApi) -> str:
-    """Reserves a single CVE ID"""
+    """Reserves a single CVE ID."""
     resp = cve_api.reserve(count=1, random=True, year=str(datetime.date.today().year))
     cve_ids = [cve["cve_id"] for cve in resp["cve_ids"]]
     assert len(cve_ids) == 1
@@ -62,10 +60,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
 
         # We only operate on in-progress security advisories.
         if state not in ("triage", "draft"):
-            print(f"    ⏭️  Skipping {ghsa_id} (state: {state})")
             continue
-
-        print(f"    📋 Processing {ghsa_id} (state: {state})")
 
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
@@ -75,10 +70,8 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
         if state == "draft" and security_advisory.get("cve_id") is None:
             cve_id = reserve_one_cve(cve_api)
             patch_data["cve_id"] = cve_id
-            print(f"       ✅ Will reserve CVE ID: {cve_id}")
 
         patch_data["collaborating_teams"] = [PSRT_GITHUB_TEAM_SLUG]
-        print(f"       ➕ Will ensure team present: {PSRT_GITHUB_TEAM_SLUG}")
 
         # Apply updates, if any, to the security advisory.
         if patch_data:
@@ -88,16 +81,14 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
                 ghsa_id=ghsa_id,
                 data=patch_data,
             )
-            print("       💾 Updated advisory")
         else:
-            print("       ⏭️  No updates needed")
+            pass
 
     if advisory_count == 0:
-        print("    ℹ️  No security advisories found")
+        pass
 
 
 def main() -> None:
-    print("Starting PSRT GitHub Security Advisory bot...")
     gh_client_private_key = base64.b64decode(os.environ["GH_CLIENT_PRIVATE_KEY"]).decode().strip()
     github = GitHub(
         AppAuthStrategy(os.environ["GH_CLIENT_ID"], gh_client_private_key),
@@ -109,7 +100,6 @@ def main() -> None:
         env=os.environ.get("CVE_ENV", "prod"),
     )
 
-    print("Fetching installations...")
     # Apply to all repositories for each installation.
     installations = github.rest.paginate(
         github.rest.apps.list_installations,
@@ -117,7 +107,6 @@ def main() -> None:
     installation_count = 0
     for installation_data in installations:
         installation_count += 1
-        print(f"\nProcessing installation {installation_count}: {installation_data.account.login}")
 
         installation_github = github.with_auth(
             github.auth.as_installation(installation_data.id),
@@ -127,10 +116,7 @@ def main() -> None:
             map_func=lambda r: r.parsed_data.repositories,
         )
         for repo in repos:
-            print(f"  Checking repo: {repo.owner.login}/{repo.name}")
             apply_to_repo(installation_github, repo.owner.login, repo.name, cve_api)
-
-    print(f"\nDone! Processed {installation_count} installation(s).")
 
 
 if __name__ == "__main__":

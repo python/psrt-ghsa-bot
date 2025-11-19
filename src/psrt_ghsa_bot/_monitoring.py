@@ -10,7 +10,6 @@ def init_sentry() -> None:
     """Initialize Sentry SDK with DSN from envvars."""
     dsn = os.environ.get("SENTRY_DSN")
     if not dsn:
-        print("⚠️  SENTRY_DSN not set, monitoring disabled")
         return
 
     sentry_sdk.init(
@@ -40,14 +39,12 @@ def capture_checkin(
     try:
         from sentry_sdk import crons
 
-        check_in_id = crons.capture_checkin(
+        return crons.capture_checkin(
             monitor_slug=monitor_slug,
             status=status,
             duration=duration,
         )
-        return check_in_id
     except (ImportError, AttributeError):
-        print("⚠️  sentry_sdk.crons not available")
         return None
 
 

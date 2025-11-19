@@ -6,7 +6,7 @@ GitHub web UI interactions that are not available through the API.
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from dotenv import load_dotenv
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
@@ -54,12 +54,12 @@ class GitHubPlaywrightClient:
         self._context: BrowserContext | None = None
         self._page: Page | None = None
 
-    def __enter__(self) -> "GitHubPlaywrightClient":
+    def __enter__(self) -> Self:
         """Context manager entry."""
         self.start()
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         """Context manager exit."""
         self.close()
 
@@ -102,14 +102,16 @@ class GitHubPlaywrightClient:
     def page(self) -> Page:
         """Get the current page instance."""
         if not self._page:
-            raise RuntimeError("Browser not started. Call start() first or use context manager.")
+            msg = "Browser not started. Call start() first or use context manager."
+            raise RuntimeError(msg)
         return self._page
 
     @property
     def context(self) -> BrowserContext:
         """Get the current browser context."""
         if not self._context:
-            raise RuntimeError("Browser not started. Call start() first or use context manager.")
+            msg = "Browser not started. Call start() first or use context manager."
+            raise RuntimeError(msg)
         return self._context
 
     def authenticate(self, force: bool = False) -> None:
@@ -134,29 +136,23 @@ class GitHubPlaywrightClient:
 
         # Check if we already have a valid session loaded from storage state
         # else we need to login (below)
-        if storage_state_file.exists() and not force:
-            print("🔍 Checking saved authentication state...")
-            if self._is_authenticated():
-                print("✅ Using saved authentication state")
-                return
-            else:
-                print("⚠️  Saved state is invalid or expired, re-authenticating...")
+        if storage_state_file.exists() and not force and self._is_authenticated():
+            return
 
         username = os.getenv("GH_BOT_USERNAME")
         password = os.getenv("GH_BOT_PASSWORD")
         if username and password:
-            print(f"🔐 Logging in as {username}...")
             self._login_with_credentials(username, password)
             # Save the new session state
             storage_state_file.parent.mkdir(parents=True, exist_ok=True)
             self.context.storage_state(path=str(storage_state_file))
-            print("✅ Login successful, state saved")
             return
 
-        raise RuntimeError(
+        msg = (
             "Authentication failed. Set GH_BOT_USERNAME and GH_BOT_PASSWORD environment variables, "
             "or use authenticate_manual() for interactive login."
         )
+        raise RuntimeError(msg)
 
     def authenticate_manual(self, timeout: int = 300_000) -> None:
         """Perform manual authentication via GitHub's login page.
@@ -170,21 +166,14 @@ class GitHubPlaywrightClient:
         """
         self.page.goto("https://github.com/login")
 
-        print("\n" + "=" * 60)
-        print("MANUAL AUTHENTICATION REQUIRED")
-        print("=" * 60)
-        print("\nPlease log in to GitHub in the browser window.")
-        print("The session will be saved for future automated runs.")
-        print(f"\nWaiting up to {timeout / 1000} seconds...")
-        print("=" * 60 + "\n")
-
         # Wait for successful login by checking for redirect to main page
         # or presence of user menu
         try:
             self.page.wait_for_url("https://github.com/**", timeout=timeout)
             self.page.wait_for_selector("button[aria-label='Open user navigation menu']", timeout=10000)
         except Exception as e:
-            raise RuntimeError(f"Manual authentication failed or timed out: {e}")
+            msg = f"Manual authentication failed or timed out: {e}"
+            raise RuntimeError(msg)
 
         storage_state_file = Path(self.storage_state_path)
         storage_state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -218,10 +207,11 @@ class GitHubPlaywrightClient:
         if "sessions/two-factor" in self.page.url:
             otp_secret = os.getenv("GH_BOT_OTP_SECRET")
             if not otp_secret:
-                raise RuntimeError(
+                msg = (
                     "2FA required but GH_BOT_OTP_SECRET not set. "
                     "Set environment variable or use authenticate_manual() for interactive login."
                 )
+                raise RuntimeError(msg)
 
             try:
                 import pyotp
@@ -235,10 +225,12 @@ class GitHubPlaywrightClient:
                 self.page.wait_for_timeout(3000)
 
             except ImportError:
-                raise RuntimeError("2FA required but pyotp not installed. did you 'uv sync' the project?")
+                msg = "2FA required but pyotp not installed. did you 'uv sync' the project?"
+                raise RuntimeError(msg)
 
         if not self._is_authenticated():
-            raise RuntimeError("Login failed - authentication check failed")
+            msg = "Login failed - authentication check failed"
+            raise RuntimeError(msg)
 
     def _is_authenticated(self) -> bool:
         """Check if the current session is authenticated.
@@ -260,8 +252,7 @@ class GitHubPlaywrightClient:
             has_dotcom_user = "dotcom_user" in auth_cookies
 
             return has_user_session and has_dotcom_user
-        except Exception as e:
-            print(f"   Debug: Auth check failed - {e}")
+        except Exception:
             return False
 
     def navigate_to_ghsa(self, owner: str, repo: str, ghsa_id: str) -> None:
