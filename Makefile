@@ -31,3 +31,14 @@ ci: lint fmt type-check test  ## Run everything
 
 app:  ## Run the app
 	@uv run python app.py
+
+### --- Bot Things
+### These all reequire .env file with the vars set based on .env.example!
+cron-run:  ## Run the cron bot (app.py)
+	@uv run python -m psrt_ghsa_bot.app
+
+playwright-run:  ## Run playwright bot
+	@uv run python -m psrt_ghsa_bot.comment_processor
+
+health-check:  ## Run health check
+	@uv run python -m psrt_ghsa_bot.health_check
