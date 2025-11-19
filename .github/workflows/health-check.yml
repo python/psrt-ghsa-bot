@@ -1,0 +1,33 @@
+name: "Health Check"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    name: "Monitor Workflow Health"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --locked --no-editable --no-dev
+
+      - name: Check workflow status and report to Sentry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: uv run python src/psrt_ghsa_bot/health_check.py

@@ -7,9 +7,12 @@ requires-python = ">=3.14.0"
 dependencies = [
     "cvelib>=1.4.0",
     "githubkit[auth-app]>=0.13.5",
+    # we might could put this into a dep group to not load it every time we install
+    # inside gh actions for cron.yml or the sentry check in
     "playwright>=1.55.0",
     "pyotp>=2.9.0",
     "python-dotenv>=1.0.0",
+    "sentry-sdk>=2.22.0",
 ]
 
 [dependency-groups]
