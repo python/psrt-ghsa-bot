@@ -20,6 +20,10 @@ fmt-check:  ## Runs Ruff format in check mode (no changes)
 type-check:  ## Run type-checking
 	@uv run ty check
 
+ty: type-check  ## Alias for type-check
+
+check: lint fmt type-check  ## Run all checks except tests
+
 test:  ## Run tests
 	@uv run pytest
 
