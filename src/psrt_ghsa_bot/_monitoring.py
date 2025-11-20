@@ -6,13 +6,15 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk import crons
 
+from psrt_ghsa_bot.settings import settings
+
 if TYPE_CHECKING:
     from psrt_ghsa_bot.config import CheckinStatus
 
 
 def init_sentry() -> None:
     """Initialize Sentry SDK with DSN from envvars."""
-    dsn = os.environ.get("SENTRY_DSN")
+    dsn = settings.monitoring.SENTRY_DSN
     if not dsn:
         return
 
@@ -37,7 +39,7 @@ def capture_checkin(
     Returns:
         Check-in ID if successful else none
     """
-    if not os.environ.get("SENTRY_DSN"):
+    if not settings.monitoring.SENTRY_DSN:
         return None
 
     try:
@@ -62,7 +64,7 @@ def report_workflow_failure(workflow_name: str, run_id: str, conclusion: str) ->
         run_id: GitHub Actions run ID
         conclusion: The conclusion status from GitHub Actions
     """
-    if not os.environ.get("SENTRY_DSN"):
+    if not settings.monitoring.SENTRY_DSN:
         return
 
     sentry_sdk.capture_message(

@@ -6,7 +6,6 @@ TODO: Maybe we should look into easily extensiblke commands
  executor, auth, results, and parser...
 """
 
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,6 +15,7 @@ from cvelib.cve_api import CveApi
 from psrt_ghsa_bot.api_app import reserve_one_cve
 from psrt_ghsa_bot.commands.authorization import AuthorizationResult, is_authorized
 from psrt_ghsa_bot.commands.parser import Command, get_help_text, get_unknown_command_response
+from psrt_ghsa_bot.settings import settings
 from psrt_ghsa_bot.state import StateManager
 
 if TYPE_CHECKING:
@@ -43,6 +43,7 @@ def execute_command(
     owner: str,
     repo: str,
     ghsa_id: str,
+    state_manager: StateManager | None = None,
 ) -> CommandResult:
     """Execute a parsed command.
 
@@ -58,6 +59,7 @@ def execute_command(
         owner: Repository owner
         repo: Repository name
         ghsa_id: GHSA identifier
+        state_manager: State manager instance (optional, creates new if None)
 
     Returns:
         CommandResult with success status and response message
@@ -83,14 +85,17 @@ def execute_command(
     if cmd.action == "publish":
         return _handle_publish(cmd, github, owner, repo, ghsa_id)
 
+    if state_manager is None:
+        state_manager = StateManager()
+
     if cmd.action == "set-deadline":
-        return _handle_set_deadline(cmd, owner, repo, ghsa_id)
+        return _handle_set_deadline(cmd, owner, repo, ghsa_id, state_manager)
 
     if cmd.action == "set-warning-days":
-        return _handle_set_warning_days(cmd, owner, repo, ghsa_id)
+        return _handle_set_warning_days(cmd, owner, repo, ghsa_id, state_manager)
 
     if cmd.action == "set-team":
-        return _handle_set_team(cmd, owner, repo, ghsa_id)
+        return _handle_set_team(cmd, owner, repo, ghsa_id, state_manager)
 
     return CommandResult(
         success=False,
@@ -270,9 +275,9 @@ def _handle_assign_cve(cmd: Command, github: GitHub, owner: str, repo: str, ghsa
 
         cve_api = CveApi(
             org="PSF",
-            username=os.environ["CVE_USERNAME"],
-            api_key=os.environ["CVE_API_KEY"],
-            env=os.environ.get("CVE_ENV", "prod"),
+            username=settings.cve.CVE_USERNAME,
+            api_key=settings.cve.CVE_API_KEY,
+            env=settings.cve.CVE_ENV,
         )
 
         cve_id = reserve_one_cve(cve_api)
@@ -319,7 +324,13 @@ def _handle_publish(cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id
     return CommandResult(success=True, message=message)
 
 
-def _handle_set_deadline(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+def _handle_set_deadline(
+    cmd: Command,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+    state_manager: StateManager,
+) -> CommandResult:
     """Handle set-deadline command.
 
     Args:
@@ -327,6 +338,7 @@ def _handle_set_deadline(cmd: Command, owner: str, repo: str, ghsa_id: str) -> C
         owner: Repository owner
         repo: Repository name
         ghsa_id: GHSA identifier
+        state_manager: State manager instance
 
     Returns:
         CommandResult with deadline confirmation
@@ -345,10 +357,8 @@ def _handle_set_deadline(cmd: Command, owner: str, repo: str, ghsa_id: str) -> C
                 message=f"❌ **Error:** Deadline must be a positive number of days (got {days})",
             )
 
-        state_manager = StateManager()
         ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
         ghsa_state.deadline_days = days
-        state_manager.save()
 
         message = (
             f"⏰ **Deadline Set**\n\n"
@@ -372,7 +382,13 @@ def _handle_set_deadline(cmd: Command, owner: str, repo: str, ghsa_id: str) -> C
         )
 
 
-def _handle_set_warning_days(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+def _handle_set_warning_days(
+    cmd: Command,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+    state_manager: StateManager,
+) -> CommandResult:
     """Handle set-warning-days command.
 
     Args:
@@ -380,6 +396,7 @@ def _handle_set_warning_days(cmd: Command, owner: str, repo: str, ghsa_id: str) 
         owner: Repository owner
         repo: Repository name
         ghsa_id: GHSA identifier
+        state_manager: State manager instance
 
     Returns:
         CommandResult with warning threshold confirmation
@@ -402,10 +419,8 @@ def _handle_set_warning_days(cmd: Command, owner: str, repo: str, ghsa_id: str) 
                 message=f"❌ **Error:** Warning threshold must be a positive number of days (got {days})",
             )
 
-        state_manager = StateManager()
         ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
         ghsa_state.warning_threshold_days = days
-        state_manager.save()
 
         message = (
             f"⚠️ **Warning Threshold Set**\n\n"
@@ -431,7 +446,13 @@ def _handle_set_warning_days(cmd: Command, owner: str, repo: str, ghsa_id: str) 
         )
 
 
-def _handle_set_team(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+def _handle_set_team(
+    cmd: Command,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+    state_manager: StateManager,
+) -> CommandResult:
     """Handle set-team command.
 
     Args:
@@ -439,6 +460,7 @@ def _handle_set_team(cmd: Command, owner: str, repo: str, ghsa_id: str) -> Comma
         owner: Repository owner
         repo: Repository name
         ghsa_id: GHSA identifier
+        state_manager: State manager instance
 
     Returns:
         CommandResult with team notification confirmation
@@ -463,10 +485,8 @@ def _handle_set_team(cmd: Command, owner: str, repo: str, ghsa_id: str) -> Comma
         )
 
     try:
-        state_manager = StateManager()
         ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
         ghsa_state.notification_team = team
-        state_manager.save()
 
         message = (
             f"👥 **Notification Team Set**\n\n"

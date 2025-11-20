@@ -5,13 +5,14 @@ GitHub web UI interactions that are not available through the API.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, Self
 
 import pyotp
 from dotenv import load_dotenv
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+
+from psrt_ghsa_bot.settings import settings
 
 load_dotenv()
 
@@ -45,14 +46,11 @@ class GitHubPlaywrightClient:
             record_video: Whether to record videos of browser sessions
         """
         self.headless = headless
-        self.auth_token = auth_token or os.getenv("GH_AUTH_TOKEN")
-        self.storage_state_path = storage_state_path or os.getenv(
-            "GH_AUTH_STATE_PATH",
-            "playwright/.auth/github_state.json",
-        )
+        self.auth_token = auth_token
+        self.storage_state_path = storage_state_path or settings.playwright.GH_AUTH_STATE_PATH
         self.slow_mo = slow_mo
         self.record_video = record_video
-        self.username = os.getenv("GH_BOT_USERNAME")
+        self.username = settings.playwright.GH_BOT_USERNAME
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -144,8 +142,8 @@ class GitHubPlaywrightClient:
         if storage_state_file.exists() and not force and self._is_authenticated():
             return
 
-        username = os.getenv("GH_BOT_USERNAME")
-        password = os.getenv("GH_BOT_PASSWORD")
+        username = settings.playwright.GH_BOT_USERNAME
+        password = settings.playwright.GH_BOT_PASSWORD
         if username and password:
             self._login_with_credentials(username, password)
             # Save the new session state
@@ -210,7 +208,7 @@ class GitHubPlaywrightClient:
         self.page.wait_for_timeout(2000)
 
         if "sessions/two-factor" in self.page.url:
-            otp_secret = os.getenv("GH_BOT_OTP_SECRET")
+            otp_secret = settings.playwright.GH_BOT_OTP_SECRET
             if not otp_secret:
                 msg = (
                     "2FA required but GH_BOT_OTP_SECRET not set. "

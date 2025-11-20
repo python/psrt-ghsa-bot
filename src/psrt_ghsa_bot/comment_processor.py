@@ -3,7 +3,6 @@
 import base64
 import contextlib
 import logging
-import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -14,6 +13,8 @@ from psrt_ghsa_bot.commands.executor import execute_command
 from psrt_ghsa_bot.commands.parser import parse_command
 from psrt_ghsa_bot.polyfills.comments import get_ghsa_comments, post_ghsa_comment
 from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
+from psrt_ghsa_bot.reminders import check_and_send_reminders
+from psrt_ghsa_bot.settings import settings
 from psrt_ghsa_bot.state import StateManager
 
 load_dotenv()
@@ -32,6 +33,58 @@ class CommentProcessingStats:
     commands_skipped: int = 0
     errors: int = 0
     reminders_sent: int = 0
+    state_entries_cleaned: int = 0
+
+
+def cleanup_closed_advisories(
+    github: GitHub,
+    state_manager: StateManager,
+) -> int:
+    """Remove closed/published advisories from state.
+
+    Args:
+        github: GitHub API client
+        state_manager: State manager instance
+
+    Returns:
+        Number of state entries removed
+    """
+    state = state_manager.load()
+    active_advisories = set()
+    installations = github.rest.paginate(github.rest.apps.list_installations)
+
+    for installation_data in installations:
+        installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
+        repos = installation_github.rest.paginate(
+            installation_github.rest.apps.list_repos_accessible_to_installation,
+            map_func=lambda r: r.parsed_data.repositories,
+        )
+
+        for repo in repos:
+            owner = repo.owner.login
+            repo_name = repo.name
+
+            try:
+                advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+                for advisory in advisories:
+                    ghsa_id = advisory["ghsa_id"]
+                    ghsa_key = f"{owner}/{repo_name}/{ghsa_id}"
+                    active_advisories.add(ghsa_key)
+            except Exception:
+                logger.exception("Error fetching advisories for %s/%s", owner, repo_name)
+                continue
+
+    entries_to_remove = [ghsa_key for ghsa_key in state.ghsas if ghsa_key not in active_advisories]
+    for ghsa_key in entries_to_remove:
+        del state.ghsas[ghsa_key]
+        logger.info("Removed closed/published advisory from state: %s", ghsa_key)
+
+    if entries_to_remove:
+        state_manager.save()
+
+    return len(entries_to_remove)
+
+
 def update_activity_tracking(
     comments: list,
     state_manager: StateManager,
@@ -121,7 +174,7 @@ def process_ghsa_comments(
 
         logger.info("Executing command: %s from @%s on %s", cmd.action, author, ghsa_id)
         try:
-            result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id)
+            result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id, state_manager)
             post_ghsa_comment(playwright_client, owner, repo, ghsa_id, result.message)
             state_manager.mark_command_processed(ghsa_key, comment_id)
             commands_executed += 1
@@ -217,12 +270,16 @@ def main() -> None:
     logger.info("=" * 50)
 
     logger.info("Initializing GitHub API client...")
-    gh_client_private_key = base64.b64decode(os.environ["GH_CLIENT_PRIVATE_KEY"]).decode().strip()
-    github = GitHub(AppAuthStrategy(os.environ["GH_CLIENT_ID"], gh_client_private_key))
+    gh_client_private_key = base64.b64decode(settings.github.GH_CLIENT_PRIVATE_KEY).decode().strip()
+    github = GitHub(AppAuthStrategy(settings.github.GH_CLIENT_ID, gh_client_private_key))
 
     logger.info("Loading state manager...")
     state_manager = StateManager()
     state_manager.load()
+
+    logger.info("Cleaning up closed/published advisories from state...")
+    cleaned = cleanup_closed_advisories(github, state_manager)
+    logger.info("Removed %d closed/published advisory entries from state", cleaned)
 
     logger.info("Starting Playwright browser...")
     with GitHubPlaywrightClient() as playwright_client:
@@ -232,6 +289,8 @@ def main() -> None:
 
         logger.info("Processing comments across all installations...")
         stats = process_all_comments(github, playwright_client, state_manager)
+        stats.state_entries_cleaned = cleaned
+
         logger.info("Collecting all active advisories for reminder check...")
         all_advisories = []
         installations = github.rest.paginate(github.rest.apps.list_installations)
@@ -263,6 +322,7 @@ def main() -> None:
         logger.info("   GHSAs checked: %d", stats.ghsas_checked)
         logger.info("   Commands executed: %d", stats.commands_executed)
         logger.info("   Reminders sent: %d", stats.reminders_sent)
+        logger.info("   State entries cleaned: %d", stats.state_entries_cleaned)
         logger.info("   Errors: %d", stats.errors)
         logger.info("=" * 50)
 

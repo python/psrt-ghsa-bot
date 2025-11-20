@@ -3,7 +3,6 @@
 import base64
 import datetime
 import json
-import os
 import typing
 from datetime import UTC
 from http import HTTPStatus
@@ -12,6 +11,8 @@ from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed
+
+from psrt_ghsa_bot.settings import settings
 
 load_dotenv()
 
@@ -92,15 +93,15 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
 
 def main() -> None:
     """Main entry point for cron.yml."""
-    gh_client_private_key = base64.b64decode(os.environ["GH_CLIENT_PRIVATE_KEY"]).decode().strip()
+    gh_client_private_key = base64.b64decode(settings.github.GH_CLIENT_PRIVATE_KEY).decode().strip()
     github = GitHub(
-        AppAuthStrategy(os.environ["GH_CLIENT_ID"], gh_client_private_key),
+        AppAuthStrategy(settings.github.GH_CLIENT_ID, gh_client_private_key),
     )
     cve_api = CveApi(
         org="PSF",
-        username=os.environ["CVE_USERNAME"],
-        api_key=os.environ["CVE_API_KEY"],
-        env=os.environ.get("CVE_ENV", "prod"),
+        username=settings.cve.CVE_USERNAME,
+        api_key=settings.cve.CVE_API_KEY,
+        env=settings.cve.CVE_ENV,
     )
 
     # Apply to all repositories for each installation.

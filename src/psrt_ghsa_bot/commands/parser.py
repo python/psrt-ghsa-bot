@@ -1,10 +1,11 @@
 """Command parser for extracting bot commands from GHSA comments."""
 
-import os
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TypedDict
+
+from psrt_ghsa_bot.settings import settings
 
 
 class CommandInfo(TypedDict, total=False):
@@ -231,7 +232,7 @@ def get_unknown_command_response(action: str, bot_username: str | None = None) -
         Formatted error message with help text
     """
     if bot_username is None:
-        bot_username = os.environ.get("GH_BOT_USERNAME", "PSRT-GHSA-Automation")
+        bot_username = settings.playwright.GH_BOT_USERNAME
 
     available = ", ".join(f"`{cmd}`" for cmd in AVAILABLE_COMMANDS)
 

@@ -1,11 +1,11 @@
 """Inactivity reminder system for GHSA advisories approaching deadlines."""
 
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from psrt_ghsa_bot.polyfills.comments.post_comment import post_ghsa_comment
+from psrt_ghsa_bot.settings import settings
 
 if TYPE_CHECKING:
     from githubkit import GitHub
@@ -16,35 +16,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO: should just move from here and .env to settings.py along with some other
-# keys that can be public
-DEFAULT_DEADLINE_DAYS = 90
-"""Deadline for activity needed on an advisory in days."""
-DEFAULT_WARNING_THRESHOLD_DAYS = 14
-"""When to start sending warnings about approaching deadlines in days."""
-HOURS_BETWEEN_REMINDERS = 23
-"""Minimum hours between daily reminders."""
-URGENT_DAYS_THRESHOLD = 7
-"""Days threshold for urgent warnings."""
-
-
-def get_default_notification_team() -> str:
-    """Get the default notification team from environment variables."""
-    return os.environ.get("DEFAULT_NOTIFICATION_TEAM", "python/psrt")
-
 
 def calculate_deadline(created_at_str: str, deadline_days: int | None) -> datetime:
     """Calculate deadline for an advisory.
 
     Args:
         created_at_str: ISO 8601 timestamp of advisory creation
-        deadline_days: Custom deadline in days, or None for default (90 days)
+        deadline_days: Custom deadline in days, or None for default
 
     Returns:
         Deadline datetime
     """
     created_at = datetime.fromisoformat(created_at_str)
-    days = deadline_days if deadline_days is not None else DEFAULT_DEADLINE_DAYS
+    days = deadline_days if deadline_days is not None else settings.reminders.DEFAULT_DEADLINE_DAYS
     return created_at + timedelta(days=days)
 
 
@@ -72,7 +56,7 @@ def should_send_reminder(
     warning_threshold = (
         ghsa_state.warning_threshold_days
         if ghsa_state.warning_threshold_days is not None
-        else DEFAULT_WARNING_THRESHOLD_DAYS
+        else settings.reminders.DEFAULT_WARNING_THRESHOLD_DAYS
     )
 
     if days_until_deadline > warning_threshold:
@@ -90,7 +74,7 @@ def should_send_reminder(
     if ghsa_state.last_reminder_sent_at is not None:
         last_reminder = datetime.fromisoformat(ghsa_state.last_reminder_sent_at)
         hours_since_reminder = (current_time - last_reminder).total_seconds() / 3600
-        if hours_since_reminder < HOURS_BETWEEN_REMINDERS:
+        if hours_since_reminder < settings.reminders.HOURS_BETWEEN_REMINDERS:
             return False, days_until_deadline
 
     return True, days_until_deadline
@@ -113,7 +97,7 @@ def format_reminder_message(
     Returns:
         Formatted markdown message
     """
-    team = notification_team if notification_team is not None else get_default_notification_team()
+    team = notification_team if notification_team is not None else settings.reminders.DEFAULT_NOTIFICATION_TEAM
 
     if days_until_deadline == 0:
         urgency = "🚨 **URGENT**"
@@ -121,7 +105,7 @@ def format_reminder_message(
     elif days_until_deadline == 1:
         urgency = "🚨 **URGENT**"
         deadline_msg = "The deadline is **tomorrow**!"
-    elif days_until_deadline <= URGENT_DAYS_THRESHOLD:
+    elif days_until_deadline <= settings.reminders.URGENT_DAYS_THRESHOLD:
         urgency = "⚠️ **WARNING**"
         deadline_msg = f"Only **{days_until_deadline} days** remain until the deadline!"
     else:
