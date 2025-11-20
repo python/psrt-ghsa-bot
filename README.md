@@ -38,7 +38,7 @@ Uses `uv` for dependency management and `pytest` for testing.
 
 ### Setup
 
-Make sure you have `uv` installed athttps://docs.astral.sh/uv/getting-started/installation/
+Make sure you have `uv` installed at https://docs.astral.sh/uv/getting-started/installation/
 Quickly, for Linux/macOS:
 ```shell
 curl -LsSf https://astral.sh/uv/install.sh | sh
