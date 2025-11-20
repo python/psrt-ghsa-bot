@@ -31,6 +31,32 @@ class CommentProcessingStats:
     commands_executed: int = 0
     commands_skipped: int = 0
     errors: int = 0
+    reminders_sent: int = 0
+def update_activity_tracking(
+    comments: list,
+    state_manager: StateManager,
+    ghsa_key: str,
+    bot_username: str,
+) -> None:
+    """Update last activity timestamp from non-bot comments.
+
+    Args:
+        comments: List of comments
+        state_manager: State manager instance
+        ghsa_key: GHSA key (owner/repo/ghsa_id)
+        bot_username: Bot's username to filter out
+    """
+    ghsa_state = state_manager.get_ghsa_state(ghsa_key)
+
+    latest_non_bot_comment = None
+    for comment in reversed(comments):
+        if comment.author != bot_username and not comment.is_bot_comment:
+            latest_non_bot_comment = comment
+            break
+
+    if latest_non_bot_comment:
+        ghsa_state.last_activity_at = latest_non_bot_comment.created_at.isoformat()
+        state_manager.save()
 
 
 def process_ghsa_comments(
@@ -70,6 +96,9 @@ def process_ghsa_comments(
         return 0
 
     logger.info("Processing %d comments on %s", len(comments), ghsa_id)
+
+    update_activity_tracking(comments, state_manager, ghsa_key, playwright_client.username)
+
     commands_executed = 0
     for comment in comments:
         comment_id = comment.id
@@ -203,11 +232,37 @@ def main() -> None:
 
         logger.info("Processing comments across all installations...")
         stats = process_all_comments(github, playwright_client, state_manager)
+        logger.info("Collecting all active advisories for reminder check...")
+        all_advisories = []
+        installations = github.rest.paginate(github.rest.apps.list_installations)
+        for installation_data in installations:
+            installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
+            repos = installation_github.rest.paginate(
+                installation_github.rest.apps.list_repos_accessible_to_installation,
+                map_func=lambda r: r.parsed_data.repositories,
+            )
+            for repo in repos:
+                owner = repo.owner.login
+                repo_name = repo.name
+                try:
+                    advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+                    for advisory in advisories:
+                        if advisory["state"] in ("triage", "draft"):
+                            advisory["repository"] = {"full_name": f"{owner}/{repo_name}"}
+                            all_advisories.append(advisory)
+                except Exception:
+                    logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
+
+        logger.info("Checking for inactivity reminders...")
+        reminders_sent = check_and_send_reminders(github, playwright_client, all_advisories, state_manager)
+        stats.reminders_sent = reminders_sent
+        logger.info("Sent %d inactivity reminders", reminders_sent)
 
         logger.info("=" * 50)
         logger.info("Processing Summary:")
         logger.info("   GHSAs checked: %d", stats.ghsas_checked)
         logger.info("   Commands executed: %d", stats.commands_executed)
+        logger.info("   Reminders sent: %d", stats.reminders_sent)
         logger.info("   Errors: %d", stats.errors)
         logger.info("=" * 50)
 

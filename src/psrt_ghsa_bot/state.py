@@ -15,7 +15,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -27,20 +27,35 @@ class GHSAState:
 
     last_processed_at: str | None = None
     commands_processed_count: int = 0
+    last_activity_at: str | None = None
+    deadline_days: int | None = None
+    warning_threshold_days: int | None = None
+    notification_team: str | None = None
+    last_reminder_sent_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
             "last_processed_at": self.last_processed_at,
             "commands_processed_count": self.commands_processed_count,
+            "last_activity_at": self.last_activity_at,
+            "deadline_days": self.deadline_days,
+            "warning_threshold_days": self.warning_threshold_days,
+            "notification_team": self.notification_team,
+            "last_reminder_sent_at": self.last_reminder_sent_at,
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> GHSAState:
+    def from_dict(cls, data: Mapping[str, Any]) -> Self:
         """Creat from dict."""
         return cls(
             last_processed_at=data.get("last_processed_at"),
             commands_processed_count=data.get("commands_processed_count", 0),
+            last_activity_at=data.get("last_activity_at"),
+            deadline_days=data.get("deadline_days"),
+            warning_threshold_days=data.get("warning_threshold_days"),
+            notification_team=data.get("notification_team"),
+            last_reminder_sent_at=data.get("last_reminder_sent_at"),
         )
 
 
@@ -61,7 +76,7 @@ class BotState:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> BotState:
+    def from_dict(cls, data: Mapping[str, Any]) -> Self:
         """Create from dict."""
         return cls(
             last_run=data.get("last_run"),

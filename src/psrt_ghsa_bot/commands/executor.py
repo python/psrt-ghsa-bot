@@ -16,6 +16,7 @@ from cvelib.cve_api import CveApi
 from psrt_ghsa_bot.api_app import reserve_one_cve
 from psrt_ghsa_bot.commands.authorization import AuthorizationResult, is_authorized
 from psrt_ghsa_bot.commands.parser import Command, get_help_text, get_unknown_command_response
+from psrt_ghsa_bot.state import StateManager
 
 if TYPE_CHECKING:
     from githubkit import GitHub
@@ -81,6 +82,15 @@ def execute_command(
 
     if cmd.action == "publish":
         return _handle_publish(cmd, github, owner, repo, ghsa_id)
+
+    if cmd.action == "set-deadline":
+        return _handle_set_deadline(cmd, owner, repo, ghsa_id)
+
+    if cmd.action == "set-warning-days":
+        return _handle_set_warning_days(cmd, owner, repo, ghsa_id)
+
+    if cmd.action == "set-team":
+        return _handle_set_team(cmd, owner, repo, ghsa_id)
 
     return CommandResult(
         success=False,
@@ -307,3 +317,169 @@ def _handle_publish(cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id
     message = "📢 **Publish Advisory** (Stub)\n\nbut for now I am just a stub cmd :)"
 
     return CommandResult(success=True, message=message)
+
+
+def _handle_set_deadline(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+    """Handle set-deadline command.
+
+    Args:
+        cmd: Parsed command
+        owner: Repository owner
+        repo: Repository name
+        ghsa_id: GHSA identifier
+
+    Returns:
+        CommandResult with deadline confirmation
+    """
+    if not cmd.arguments:
+        return CommandResult(
+            success=False,
+            message="❌ **Error:** Missing deadline days\n\nUsage: `set-deadline <days>`\n\nExample: `set-deadline 60`",
+        )
+
+    try:
+        days = int(cmd.arguments[0])
+        if days <= 0:
+            return CommandResult(
+                success=False,
+                message=f"❌ **Error:** Deadline must be a positive number of days (got {days})",
+            )
+
+        state_manager = StateManager()
+        ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
+        ghsa_state.deadline_days = days
+        state_manager.save()
+
+        message = (
+            f"⏰ **Deadline Set**\n\n"
+            f"**Advisory:** {ghsa_id}\n"
+            f"**Deadline:** {days} days from advisory creation\n\n"
+            f"Inactivity reminders will be sent when approaching this deadline."
+        )
+
+        return CommandResult(success=True, message=message)
+
+    except ValueError:
+        return CommandResult(
+            success=False,
+            message=f"❌ **Error:** Invalid number: '{cmd.arguments[0]}'\n\nDeadline must be a positive integer.",
+        )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"❌ **Error:** Failed to set deadline: {e!s}",
+            error=e,
+        )
+
+
+def _handle_set_warning_days(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+    """Handle set-warning-days command.
+
+    Args:
+        cmd: Parsed command
+        owner: Repository owner
+        repo: Repository name
+        ghsa_id: GHSA identifier
+
+    Returns:
+        CommandResult with warning threshold confirmation
+    """
+    if not cmd.arguments:
+        return CommandResult(
+            success=False,
+            message=(
+                "❌ **Error:** Missing warning threshold days\n\n"
+                "Usage: `set-warning-days <days>`\n\n"
+                "Example: `set-warning-days 14`"
+            ),
+        )
+
+    try:
+        days = int(cmd.arguments[0])
+        if days <= 0:
+            return CommandResult(
+                success=False,
+                message=f"❌ **Error:** Warning threshold must be a positive number of days (got {days})",
+            )
+
+        state_manager = StateManager()
+        ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
+        ghsa_state.warning_threshold_days = days
+        state_manager.save()
+
+        message = (
+            f"⚠️ **Warning Threshold Set**\n\n"
+            f"**Advisory:** {ghsa_id}\n"
+            f"**Warning Threshold:** {days} days before deadline\n\n"
+            f"Inactivity reminders will start {days} days before the deadline if there has been no activity."
+        )
+
+        return CommandResult(success=True, message=message)
+
+    except ValueError:
+        return CommandResult(
+            success=False,
+            message=(
+                f"❌ **Error:** Invalid number: '{cmd.arguments[0]}'\n\nWarning threshold must be a positive integer."
+            ),
+        )
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"❌ **Error:** Failed to set warning threshold: {e!s}",
+            error=e,
+        )
+
+
+def _handle_set_team(cmd: Command, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+    """Handle set-team command.
+
+    Args:
+        cmd: Parsed command
+        owner: Repository owner
+        repo: Repository name
+        ghsa_id: GHSA identifier
+
+    Returns:
+        CommandResult with team notification confirmation
+    """
+    if not cmd.arguments:
+        return CommandResult(
+            success=False,
+            message=(
+                "❌ **Error:** Missing team identifier\n\nUsage: `set-team <team>`\n\nExample: `set-team python/psrt`"
+            ),
+        )
+
+    team = cmd.arguments[0]
+
+    if "/" not in team:
+        return CommandResult(
+            success=False,
+            message=(
+                f"❌ **Error:** Invalid team format: '{team}'\n\n"
+                f"Team must be in format `org/team` (e.g., `python/psrt`)"
+            ),
+        )
+
+    try:
+        state_manager = StateManager()
+        ghsa_state = state_manager.get_ghsa_state(f"{owner}/{repo}/{ghsa_id}")
+        ghsa_state.notification_team = team
+        state_manager.save()
+
+        message = (
+            f"👥 **Notification Team Set**\n\n"
+            f"**Advisory:** {ghsa_id}\n"
+            f"**Team:** @{team}\n\n"
+            f"This team will be mentioned in inactivity reminder notifications."
+        )
+
+        return CommandResult(success=True, message=message)
+
+    except Exception as e:
+        return CommandResult(
+            success=False,
+            message=f"❌ **Error:** Failed to set notification team: {e!s}",
+            error=e,
+        )
