@@ -220,19 +220,18 @@ def test_get_ghsa_comments_error_handling_invalid_ghsa() -> None:
         client.authenticate()
 
         # Try to get comments from a non-existent GHSA
-        # This should either return empty list or raise a reasonable error
-        try:
-            comments = get_ghsa_comments(
+        # Should raise PermissionError for 404/access denied
+        with pytest.raises((PermissionError, Exception)) as exc_info:
+            get_ghsa_comments(
                 client,
                 owner="jolt-org",
                 repo="ghsa-testing",
-                ghsa_id="GHSA-0000-0000-0000",  # Invalid GHSA
+                ghsa_id="GHSA-0000-0000-0000",
             )
-            # If it doesn't error, should return empty list
-            assert isinstance(comments, list)
-        except Exception as e:
-            # If it does error, should be a reasonable error message
-            assert "GHSA" in str(e) or "404" in str(e) or "not found" in str(e).lower()
+
+        if exc_info.type is not PermissionError:
+            error_msg = str(exc_info.value).lower()
+            assert "ghsa" in error_msg or "404" in error_msg or "not found" in error_msg
 
 
 @pytest.mark.skip(reason="Integration test - requires specific test GHSA with known comment count")

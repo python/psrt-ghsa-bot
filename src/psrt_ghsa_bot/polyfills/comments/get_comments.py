@@ -5,8 +5,9 @@ on Security Advisories in draft/triage state. This module uses browser
 automation to extract comment data from the GitHub web UI.
 """
 
+import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from playwright.sync_api import Locator
@@ -14,6 +15,8 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 if TYPE_CHECKING:
     from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,7 +45,7 @@ def get_ghsa_comments(
     client: GitHubPlaywrightClient,
     owner: str,
     repo: str,
-    ghsa_id: str,    debug: bool = False,
+    ghsa_id: str,
 ) -> list[GHSAComment]:
     """Get all comments from a GitHub Security Advisory using Playwright.
 
@@ -54,7 +57,6 @@ def get_ghsa_comments(
         owner: Repository owner (organization or user)
         repo: Repository name
         ghsa_id: GHSA identifier (e.g., GHSA-xxxx-xxxx-xxxx)
-        debug: Enable debug output
 
     Returns:
         List of GHSAComment objects in chronological order
@@ -72,8 +74,17 @@ def get_ghsa_comments(
     """
     client.navigate_to_ghsa(owner, repo, ghsa_id)
 
+    if "404" in client.page.title() or client.page.locator("text=404").count() > 0:
+        msg = f"Advisory {ghsa_id} not found or bot lacks access (collaborator permissions required)"
+        raise PermissionError(msg)
+
+    try:
+        client.page.wait_for_selector(".timeline-comment, .js-comment", timeout=10000, state="attached")
+    except PlaywrightTimeoutError:
+        logger.debug("Timeout waiting for comments to load on %s", ghsa_id)
+
     _load_all_comments(client)
-    return _extract_comments(client, debug=debug)
+    return _extract_comments(client)
 
 
 def _load_all_comments(client: GitHubPlaywrightClient) -> None:
@@ -117,58 +128,53 @@ def _load_all_comments(client: GitHubPlaywrightClient) -> None:
             break
 
 
-def _extract_comments(client: GitHubPlaywrightClient, debug: bool = False) -> list[GHSAComment]:
+def _extract_comments(client: GitHubPlaywrightClient) -> list[GHSAComment]:
     """Extract all comment data from the current page.
 
     Uses multiple fallback selectors to handle GitHub UI changes.
 
     Args:
         client: GitHubPlaywrightClient instance
-        debug: Enable debug output
 
     Returns:
         List of parsed GHSAComment objects
     """
     comments: list[GHSAComment] = []
     comment_selectors = [
+        ".js-comment-container .timeline-comment",
         ".timeline-comment",
-        ".TimelineItem-body",
-        "[data-hpc]",
         ".js-comment",
+        "div.TimelineItem.js-comment-container",
     ]
 
     comment_elements: list[Locator] = []
     for selector in comment_selectors:
         try:
             elements = client.page.locator(selector).all()
-            if debug and elements:
-                print(f"\n         🔍 DEBUG: Found {len(elements)} elements with selector '{selector}'")
+            logger.debug("Selector '%s' found %d elements", selector, len(elements))
             if elements:
                 comment_elements = elements
                 break
         except Exception as e:
-            if debug:
-                print(f"\n         🔍 DEBUG: Selector '{selector}' failed: {e}")
+            logger.debug("Selector '%s' failed: %s", selector, e)
             continue
 
     if not comment_elements:
-        if debug:
-            print("\n         🔍 DEBUG: No comment elements found with any selector")
+        logger.debug("No comment elements found with any selector")
         return comments
 
-    if debug:
-        print(f"\n         🔍 DEBUG: Parsing {len(comment_elements)} comment elements")
+    logger.debug("Parsing %d comment elements", len(comment_elements))
 
     for idx, element in enumerate(comment_elements):
         try:
             comment = _parse_comment_element(element, idx)
             if comment:
                 comments.append(comment)
-                if debug:
-                    print(f"\n         🔍 DEBUG: Parsed comment from @{comment.author}: {comment.body[:30]}...")
+                logger.debug("Parsed comment from @%s: %s", comment.author, comment.body[:30])
+            else:
+                logger.debug("Element %d returned None (not a comment)", idx)
         except Exception as e:
-            if debug:
-                print(f"\n         🔍 DEBUG: Failed to parse element {idx}: {e}")
+            logger.debug("Failed to parse element %d: %s", idx, e)
             continue
 
     return comments
@@ -192,6 +198,7 @@ def _parse_comment_element(element: Locator, fallback_idx: int) -> GHSAComment |
             if comment_id:
                 break
         except Exception:
+            logger.exception("Failed to get attribute %s", attr)
             continue
 
     if not comment_id:
@@ -214,9 +221,11 @@ def _parse_comment_element(element: Locator, fallback_idx: int) -> GHSAComment |
                 author = author.strip()
                 break
         except Exception:
+            logger.exception("Failed to get author with selector %s", selector)
             continue
 
     if not author:
+        logger.debug("Element %d: No author found, skipping", fallback_idx)
         return None
 
     body = None
@@ -235,6 +244,7 @@ def _parse_comment_element(element: Locator, fallback_idx: int) -> GHSAComment |
                 body = body.strip()
                 break
         except Exception:
+            logger.exception("Failed to get body with selector %s", selector)
             continue
 
     if not body:
@@ -279,9 +289,10 @@ def _extract_timestamp(element: Locator, timestamp_type: str) -> datetime:
             if datetime_str:
                 return datetime.fromisoformat(datetime_str)
         except Exception:
+            logger.exception("Failed to get timestamp with selector %s", selector)
             continue
 
-    return datetime.now()
+    return datetime.now(tz=UTC)
 
 
 def _is_bot_author(element: Locator, author: str) -> bool:

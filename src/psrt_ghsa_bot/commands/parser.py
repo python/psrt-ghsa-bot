@@ -3,7 +3,7 @@
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TypedDict
 
 
@@ -32,6 +32,7 @@ class Command:
     """When the command was issued"""
 
     def __repr__(self) -> str:
+        """String repr for debugs."""
         args_str = " ".join(self.arguments) if self.arguments else "(no args)"
         return f"Command({self.action} {args_str} by {self.author})"
 
@@ -136,7 +137,7 @@ def parse_command(
     arguments = arguments_str.split() if arguments_str else []
 
     if timestamp is None:
-        timestamp = datetime.now()
+        timestamp = datetime.now(tz=UTC)
 
     return Command(
         action=action,

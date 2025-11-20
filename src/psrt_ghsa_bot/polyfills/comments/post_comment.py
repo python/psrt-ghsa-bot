@@ -1,11 +1,14 @@
 """For posting comments to GHSA using Playwright."""
 
+import logging
 from typing import TYPE_CHECKING
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 if TYPE_CHECKING:
     from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
+
+logger = logging.getLogger(__name__)
 
 
 def post_ghsa_comment(
@@ -79,7 +82,7 @@ def _fill_comment_form(client: GitHubPlaywrightClient, comment_body: str) -> Non
             "Could not find comment textarea. The page structure may have changed, "
             "or you may not have permission to comment on this advisory."
         )
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from None
 
 
 def _submit_comment(client: GitHubPlaywrightClient) -> None:
@@ -97,7 +100,7 @@ def _submit_comment(client: GitHubPlaywrightClient) -> None:
         submit_button.click()
     except PlaywrightTimeoutError:
         msg = "Could not find comment submit button. The page structure may have changed."
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from None
 
 
 def _wait_for_comment_posted(
@@ -133,17 +136,17 @@ def _wait_for_comment_posted(
                         return comment_id.replace("advisory-comment-", "")
                     return "comment-posted"
             except Exception:
-                continue
+                logger.exception("Error checking timeline item: %s", item)
 
-        msg = (
-            f"Comment was submitted but could not be found on the page within {timeout}ms. "
-            "It may have been posted successfully but not yet visible."
-        )
-        raise RuntimeError(msg)
+                msg = (
+                    f"Comment was submitted but could not be found on the page within {timeout}ms. "
+                    "It may have been posted successfully but not yet visible."
+                )
+        raise RuntimeError(msg) from None
 
     except PlaywrightTimeoutError:
         msg = (
             f"Comment was submitted but could not be found on the page within {timeout}ms. "
             "It may have been posted successfully but not yet visible."
         )
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from None

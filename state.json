@@ -1,12 +1,12 @@
 {
-  "last_run": "2025-11-19T21:17:09.904204+00:00",
+  "last_run": "2025-11-20T00:20:10.935213+00:00",
   "ghsas": {
     "jolt-org/ghsa-testing/GHSA-f3x5-4pp6-r2mf": {
       "last_comment_id": "comment-17",
       "last_processed_at": "2025-11-19T21:12:48.590575+00:00",
       "processed_commands": [
-        "ed3d1e88521c7bc4",
         "4d55106d50489f70",
+        "ed3d1e88521c7bc4",
         "b47d14abe3060256"
       ],
       "commands_processed_count": 3

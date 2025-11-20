@@ -8,6 +8,7 @@ TODO: Maybe we should look into easily extensiblke commands
 
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from cvelib.cve_api import CveApi
@@ -42,9 +43,9 @@ def execute_command(
     repo: str,
     ghsa_id: str,
 ) -> CommandResult:
-    """Execute a parsed command like:
+    """Execute a parsed command.
 
-    "@<bot-username> assign-cve"
+    Example: "@<bot-username> assign-cve"
 
     These are based on src/psrt_ghsa_bot/commands/parser.py:AVAILABLE_COMMANDS
     and do an auth check before trying.
@@ -120,7 +121,7 @@ def _handle_help(playwright_client: GitHubPlaywrightClient) -> CommandResult:
     return CommandResult(success=True, message=help_text)
 
 
-def _handle_status(cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id: str) -> CommandResult:
+def _handle_status(_cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id: str) -> CommandResult:
     """Handle status command.
 
     Args:
@@ -140,9 +141,6 @@ def _handle_status(cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id:
         cve_id = advisory.parsed_data.cve_id or "None assigned"
         created_at = advisory.parsed_data.created_at
         updated_at = advisory.parsed_data.updated_at
-
-        from datetime import datetime
-
         created = datetime.fromisoformat(created_at)
         days_old = (datetime.now(created.tzinfo) - created).days
 
@@ -254,7 +252,7 @@ def _handle_assign_cve(cmd: Command, github: GitHub, owner: str, repo: str, ghsa
             return CommandResult(
                 success=False,
                 message=(
-                    f"ℹ️ **CVE Already Assigned**\n\n"
+                    f"**CVE Already Assigned**\n\n"
                     f"Advisory {ghsa_id} already has CVE ID {current_cve} assigned.\n\n"
                     f"Use `status` to view advisory details or `reject {current_cve}` to remove it."
                 ),

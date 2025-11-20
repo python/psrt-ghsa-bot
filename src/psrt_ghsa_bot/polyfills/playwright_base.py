@@ -4,14 +4,18 @@ This module provides authentication and navigation utilities for automating
 GitHub web UI interactions that are not available through the API.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Self
 
+import pyotp
 from dotenv import load_dotenv
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubPlaywrightClient:
@@ -24,6 +28,7 @@ class GitHubPlaywrightClient:
 
     def __init__(
         self,
+        *,
         headless: bool = True,
         auth_token: str | None = None,
         storage_state_path: str | None = None,
@@ -114,7 +119,7 @@ class GitHubPlaywrightClient:
             raise RuntimeError(msg)
         return self._context
 
-    def authenticate(self, force: bool = False) -> None:
+    def authenticate(self, *, force: bool = False) -> None:
         """Authenticate to GitHub using storage state or credentials.
 
         Authentication methods tried in order:
@@ -171,16 +176,16 @@ class GitHubPlaywrightClient:
         try:
             self.page.wait_for_url("https://github.com/**", timeout=timeout)
             self.page.wait_for_selector("button[aria-label='Open user navigation menu']", timeout=10000)
-        except Exception as e:
-            msg = f"Manual authentication failed or timed out: {e}"
-            raise RuntimeError(msg)
+        except Exception as err:
+            msg = f"Manual authentication failed or timed out: {err}"
+            raise RuntimeError(msg) from err
 
         storage_state_file = Path(self.storage_state_path)
         storage_state_file.parent.mkdir(parents=True, exist_ok=True)
         self.context.storage_state(path=str(storage_state_file))
 
-        print("\n✅ Authentication successful! Session saved.")
-        print(f"   State saved to: {storage_state_file}\n")
+        logger.info("Authentication successful! Session saved.")
+        logger.info("State saved to: %s", storage_state_file)
 
     def _login_with_credentials(self, username: str, password: str) -> None:
         """Perform automated login with username and password.
@@ -214,11 +219,9 @@ class GitHubPlaywrightClient:
                 raise RuntimeError(msg)
 
             try:
-                import pyotp
-
                 totp = pyotp.TOTP(otp_secret)
                 otp_code = totp.now()
-                print("   Using OTP code for 2FA...")
+                logger.info("Using OTP code for 2FA...")
 
                 self.page.locator('input[name="app_otp"]').fill(otp_code)
                 self.page.locator('button[type="submit"]:has-text("Verify")').click()
@@ -226,7 +229,7 @@ class GitHubPlaywrightClient:
 
             except ImportError:
                 msg = "2FA required but pyotp not installed. did you 'uv sync' the project?"
-                raise RuntimeError(msg)
+                raise RuntimeError(msg) from None
 
         if not self._is_authenticated():
             msg = "Login failed - authentication check failed"
@@ -250,10 +253,10 @@ class GitHubPlaywrightClient:
 
             has_user_session = "user_session" in auth_cookies
             has_dotcom_user = "dotcom_user" in auth_cookies
-
-            return has_user_session and has_dotcom_user
         except Exception:
             return False
+        else:
+            return has_user_session and has_dotcom_user
 
     def navigate_to_ghsa(self, owner: str, repo: str, ghsa_id: str) -> None:
         """Navigate to a specific GitHub Security Advisory page.

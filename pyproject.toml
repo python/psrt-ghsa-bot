@@ -37,7 +37,19 @@ indent-width = 4
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D203", "D213", "COM812", "T201"]
+ignore = [
+    "D203",
+    "D213",
+    "COM812",
+    "T201",
+    "TD",  # todo without author
+    "FIX002",  # Line contains TODO
+    "PLR0913", # Too many arguments
+    "PLR0911", # Too many returns
+    "C901",   # Too complex
+    "ARG001", # unused arg
+    "BLE001", # blind except
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -70,7 +82,16 @@ indent-style = "space"
     "SLF",
     "ANN",
     "FIX",
-    "TD"
+    "TD",
+    "ERA",
+]
+"scripts/**/*.*" = [
+    "INP001",  # Implicit namespace package
+    "EXE001",  # Shebang not executable
+    "RUF001",  # Ambiguous unicode
+    "DTZ",     # Timezone issues
+    "S",       # Security issues
+    "T201",    # Print statements
 ]
 
 [tool.ruff.lint.pydocstyle]

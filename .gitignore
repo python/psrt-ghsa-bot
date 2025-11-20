@@ -171,3 +171,4 @@ playwright-videos/
 playwright-traces/
 *.webm
 trace.zip
+debug_*.png

@@ -4,6 +4,7 @@ import os
 from typing import Literal
 
 import sentry_sdk
+from sentry_sdk import crons
 
 
 def init_sentry() -> None:
@@ -37,8 +38,6 @@ def capture_checkin(
         return None
 
     try:
-        from sentry_sdk import crons
-
         return crons.capture_checkin(
             monitor_slug=monitor_slug,
             status=status,
@@ -70,6 +69,8 @@ def report_workflow_failure(workflow_name: str, run_id: str, conclusion: str) ->
             "workflow_name": workflow_name,
             "run_id": run_id,
             "conclusion": conclusion,
-            "workflow_url": f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'unknown')}/actions/runs/{run_id}",
+            "workflow_url": (
+                f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'unknown')}/actions/runs/{run_id}"
+            ),
         },
     )

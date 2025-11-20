@@ -102,7 +102,7 @@ class StateManager:
 
         if self.state_file.exists():
             try:
-                with open(self.state_file) as f:
+                with self.state_file.open() as f:
                     data = json.load(f)
                 self._state = BotState.from_dict(data)
             except (json.JSONDecodeError, KeyError):
@@ -120,7 +120,7 @@ class StateManager:
         self._state.last_run = datetime.now(UTC).isoformat()
 
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.state_file, "w") as f:
+        with self.state_file.open("w") as f:
             json.dump(self._state.to_dict(), f, indent=2)
 
     def get_ghsa_state(self, ghsa_id: str) -> GHSAState:

@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from githubkit import GitHub
 
+from http import HTTPStatus
+
 
 @dataclass
 class AuthorizationResult:
@@ -90,9 +92,10 @@ def _is_psrt_team_member(github: GitHub, username: str) -> bool:
             team_slug="psrt",
             username=username,
         )
-        return response.status_code == 204
     except Exception:
         return False
+    else:
+        return response.status_code == HTTPStatus.NO_CONTENT
 
 
 def _is_ghsa_collaborator(
@@ -159,9 +162,10 @@ def _is_team_member(
             team_slug=team_slug,
             username=username,
         )
-        return response.status_code == 204
     except Exception:
         return False
+    else:
+        return response.status_code == HTTPStatus.NO_CONTENT
 
 
 def _is_repo_admin(
@@ -190,7 +194,7 @@ def _is_repo_admin(
 
         if not response.parsed_data or not response.parsed_data.permission:
             return False
-
-        return response.parsed_data.permission == "admin"
     except Exception:
         return False
+    else:
+        return response.parsed_data.permission == "admin"
