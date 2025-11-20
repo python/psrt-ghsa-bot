@@ -32,13 +32,18 @@ like:
 That's why there is this weird split between the cron.yml and playwright.yml. As API things
 are added, we can move more into app.py/cron.yml and remove the playwright stuff (gladly!)
 
-### Notes
+## Notes
+
+The GitHub app (API-related activities) **MUST** be installed in all GitHub organizations
+you want scanned. The GitHub user (`GH_BOT_USERNAME`, used by Playwright) **MUST** have access to the repos that
+you want to interact with.
 
 One things about the Playwright deal is that it uses the GitHub installation from the API bits
 to generate a list of repos (~[comment_processor.py:130-140](src/psrt_ghsa_bot/comment_processor.py#L130-L140)).
 This is sort've praying that the GitHub app installation and the GitHub user that you set up
 has the same permissions. There's not really a way I can see to ensure same-permissions so this is
 a best effort and it would be caught quickly in local testing at least (I hope.)
+
 
 ## Development
 
