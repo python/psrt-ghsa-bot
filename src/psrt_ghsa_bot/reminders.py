@@ -1,4 +1,10 @@
-"""Inactivity reminder system for GHSA advisories approaching deadlines."""
+"""Inactivity reminder system for GHSA advisories approaching deadlines.
+
+TODO: I think i have a lingering questions on this..
+- if it hits deadline what do we do even if it is active?
+- do we need a playwright polyfill to close the advisory if inactive for the full 90 days
+ or do we just drop from state.json?
+"""
 
 import logging
 from datetime import UTC, datetime, timedelta
@@ -33,9 +39,9 @@ def calculate_deadline(created_at_str: str, deadline_days: int | None) -> dateti
 
 
 def should_send_reminder(
-    ghsa_state: GHSAState,
-    advisory_created_at: str,
-    current_time: datetime,
+        ghsa_state: GHSAState,
+        advisory_created_at: str,
+        current_time: datetime,
 ) -> tuple[bool, int]:
     """Check if an inactivity reminder should be sent.
 
@@ -81,10 +87,10 @@ def should_send_reminder(
 
 
 def format_reminder_message(
-    ghsa_id: str,
-    days_until_deadline: int,
-    days_since_activity: int | None,
-    notification_team: str | None,
+        ghsa_id: str,
+        days_until_deadline: int,
+        days_since_activity: int | None,
+        notification_team: str | None,
 ) -> str:
     """Format the reminder comment message.
 
@@ -130,10 +136,10 @@ def format_reminder_message(
 
 
 def check_and_send_reminders(
-    github: GitHub,
-    playwright_client: GitHubPlaywrightClient,
-    advisories: list[dict],
-    state_manager: StateManager,
+        github: GitHub,
+        playwright_client: GitHubPlaywrightClient,
+        advisories: list[dict],
+        state_manager: StateManager,
 ) -> int:
     """Check all active advisories and send reminders if needed.
 
