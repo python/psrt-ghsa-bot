@@ -25,6 +25,7 @@ ty: type-check  ## Alias for type-check
 check: lint fmt type-check  ## Run all checks except tests
 
 test:  ## Run tests
+	@test -f tests/PLAYWRIGHT_FULL.test && uv run playwright install --with-deps chromium 2>/dev/null || true
 	@uv run pytest
 
 ci: lint fmt type-check test  ## Run everything

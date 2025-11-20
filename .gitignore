@@ -172,3 +172,4 @@ playwright-traces/
 *.webm
 trace.zip
 debug_*.png
+tests/PLAYWRIGHT_FULL.test

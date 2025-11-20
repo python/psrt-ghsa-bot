@@ -18,6 +18,8 @@ from psrt_ghsa_bot.polyfills import (
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+PLAYWRIGHT_FULL = Path("tests/PLAYWRIGHT_FULL.test").exists()
+
 
 @pytest.fixture
 def authenticated_client() -> Generator[GitHubPlaywrightClient]:
@@ -111,8 +113,8 @@ def test_get_ghsa_comments_basic(authenticated_client: GitHubPlaywrightClient) -
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_ghsa_comment_dataclass_repr() -> None:
     """Test the GHSAComment repr method."""
@@ -133,8 +135,8 @@ def test_ghsa_comment_dataclass_repr() -> None:
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_get_ghsa_comments_with_no_comments(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test retrieval from a GHSA with no comments."""
@@ -152,8 +154,8 @@ def test_get_ghsa_comments_with_no_comments(authenticated_client: GitHubPlaywrig
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_get_ghsa_comments_bot_detection(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test that bot comments are properly detected."""
@@ -166,15 +168,14 @@ def test_get_ghsa_comments_bot_detection(authenticated_client: GitHubPlaywrightC
 
     # Check if any bot comments are detected
     bot_comments = [c for c in comments if c.is_bot_comment]
-    [c for c in comments if not c.is_bot_comment]
 
     for bot_comment in bot_comments:
         assert "bot" in bot_comment.author.lower() or "[bot]" in bot_comment.author
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_get_ghsa_comments_chronological_order(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test that comments are returned in chronological order."""
@@ -211,8 +212,8 @@ def test_ghsa_comment_dataclass_fields() -> None:
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_get_ghsa_comments_error_handling_invalid_ghsa() -> None:
     """Test error handling for invalid GHSA ID."""
@@ -279,8 +280,8 @@ def test_post_ghsa_comment_basic(authenticated_client: GitHubPlaywrightClient, t
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_post_and_read_comment_roundtrip(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test posting a comment and then reading it back."""
@@ -313,28 +314,28 @@ def test_post_and_read_comment_roundtrip(authenticated_client: GitHubPlaywrightC
 
 def test_post_comment_empty_body_error() -> None:
     """Test that posting an empty comment raises ValueError."""
-    with GitHubPlaywrightClient(headless=True) as client:
-        with pytest.raises(ValueError, match="comment_body cannot be empty"):
-            post_ghsa_comment(
-                client,
-                owner="jolt-org",
-                repo="ghsa-testing",
-                ghsa_id="GHSA-f3x5-4pp6-r2mf",
-                comment_body="",
-            )
+    client = GitHubPlaywrightClient(headless=True)
+    with pytest.raises(ValueError, match="comment_body cannot be empty"):
+        post_ghsa_comment(
+            client,
+            owner="jolt-org",
+            repo="ghsa-testing",
+            ghsa_id="GHSA-f3x5-4pp6-r2mf",
+            comment_body="",
+        )
 
 
 def test_post_comment_whitespace_only_error() -> None:
     """Test that posting whitespace-only comment raises ValueError."""
-    with GitHubPlaywrightClient(headless=True) as client:
-        with pytest.raises(ValueError, match="comment_body cannot be empty"):
-            post_ghsa_comment(
-                client,
-                owner="jolt-org",
-                repo="ghsa-testing",
-                ghsa_id="GHSA-f3x5-4pp6-r2mf",
-                comment_body="   \n\t  ",
-            )
+    client = GitHubPlaywrightClient(headless=True)
+    with pytest.raises(ValueError, match="comment_body cannot be empty"):
+        post_ghsa_comment(
+            client,
+            owner="jolt-org",
+            repo="ghsa-testing",
+            ghsa_id="GHSA-f3x5-4pp6-r2mf",
+            comment_body="   \n\t  ",
+        )
 
 
 @pytest.mark.skip(reason="Manual test - posts to real GHSA")

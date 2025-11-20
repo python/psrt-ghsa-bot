@@ -1,0 +1,8 @@
+# Touch this file to enable full Playwright integration tests
+# These tests require:
+# - Playwright browsers installed (playwright install)
+# - Authentication state (playwright/.auth/github_state.json)
+# - Network access to GitHub
+# 
+# These tests are skipped in CI by default to avoid flakiness
+# remove ``.example` from the filename to enable them

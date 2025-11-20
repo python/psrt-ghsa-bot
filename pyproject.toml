@@ -98,5 +98,4 @@ indent-style = "space"
 convention = "google"
 
 [tool.pytest.ini_options]
-anyio_mode = "strict"
-asyncio_default_fixture_loop_scope = "function"
+addopts = "-p no:anyio"

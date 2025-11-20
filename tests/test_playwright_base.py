@@ -6,6 +6,8 @@ import pytest
 
 from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 
+PLAYWRIGHT_FULL = Path("tests/PLAYWRIGHT_FULL.test").exists()
+
 
 @pytest.fixture
 def client() -> GitHubPlaywrightClient:
@@ -39,8 +41,8 @@ def test_navigate_to_public_page(client: GitHubPlaywrightClient) -> None:
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing auth state (PAT tokens don't work for web UI auth)",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_authentication_with_saved_state(client: GitHubPlaywrightClient) -> None:
     """Test authentication using saved state from manual login."""
@@ -50,8 +52,8 @@ def test_authentication_with_saved_state(client: GitHubPlaywrightClient) -> None
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient) -> None:
     """Test navigation to a GHSA page (requires authentication)."""
@@ -66,8 +68,8 @@ def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient) -> None:
 
 
 @pytest.mark.skipif(
-    not Path("playwright/.auth/github_state.json").exists(),
-    reason="Requires existing authentication state",
+    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
+    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
 )
 def test_authentication_state_persistence(client: GitHubPlaywrightClient) -> None:
     """Test that authentication state is saved and can be reused."""
