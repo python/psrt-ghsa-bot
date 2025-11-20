@@ -26,7 +26,7 @@ like:
 - Commenting on GHSAs
 - Adding teams to GHSAs
 - Assigning CVE IDs to GHSAs
-- Removing temporary forks generated inside a GHSA that collaboraters use fro remediation
+- Removing temporary forks generated inside a GHSA that collaborators use fro remediation
 - No webhooks to respond to things.. so we do the GHA polling thing...
 
 That's why there is this weird split between the cron.yml and playwright.yml. As API things
