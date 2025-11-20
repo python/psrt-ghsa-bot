@@ -10,3 +10,5 @@
  2025-11-19 21:56:46,918 - __main__ - INFO - Checking GHSA: jolt-org/ghsa-testing/GHSA-f3x5-4pp6-r2mf (state: draft)
  ```
  Caused 2 bot responses that were huge, so we should just do one somehow.
+- for running out of headless, record video, etc. set sentinels in settings.py then use make targets
+- if someone has multiple @s in the bot maybe we can process all found
