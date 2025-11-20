@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 
-from psrt_ghsa_bot.app import get_repository_advisories
+from psrt_ghsa_bot.api_app import get_repository_advisories
 from psrt_ghsa_bot.commands.executor import execute_command
 from psrt_ghsa_bot.commands.parser import parse_command
 from psrt_ghsa_bot.polyfills.comments import get_ghsa_comments, post_ghsa_comment

@@ -63,8 +63,8 @@ act-cron: act-check  ## Test cron workflow locally using act
 ##@ Live Bot Commands
 ### These all require .env file with the vars set based on .env.example!
 
-cron:  ## Run the cron bot (app.py)
-	@uv run python -m psrt_ghsa_bot.app
+cron:  ## Run the cron bot (api_app.py)
+	@uv run python -m psrt_ghsa_bot.api_app
 
 playwright:  ## Run playwright bot
 	@uv run python -m psrt_ghsa_bot.comment_processor

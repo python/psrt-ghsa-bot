@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from cvelib.cve_api import CveApi
 
-from psrt_ghsa_bot.app import reserve_one_cve
+from psrt_ghsa_bot.api_app import reserve_one_cve
 from psrt_ghsa_bot.commands.authorization import AuthorizationResult, is_authorized
 from psrt_ghsa_bot.commands.parser import Command, get_help_text, get_unknown_command_response
 

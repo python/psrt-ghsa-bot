@@ -7,7 +7,7 @@ Bot which adds the PSRT GitHub team (`python/psrt`) and CVE IDs to GitHub Securi
 ### GitHub Actions
 
 - The cron bot runs off of [`.github/workflows/cron.yml`](.github/workflows/cron.yml) and runs at the top of each hour.
-  - Calls [src/psrt_ghsa_bot/app.py](src/psrt_ghsa_bot/app.py)
+  - Calls [src/psrt_ghsa_bot/api_app.py](src/psrt_ghsa_bot/api_app.py)
   - Fetches open GHSAs from all installed orgs/repos
   - Adds PSRT team to GHSAs without it
   - Assigns CVE IDs to draft GHSAs without one
@@ -30,7 +30,7 @@ like:
 - No webhooks to respond to things.. so we do the GHA polling thing...
 
 That's why there is this weird split between the cron.yml and playwright.yml. As API things
-are added, we can move more into app.py/cron.yml and remove the playwright stuff (gladly!)
+are added, we can move more into api_app.py/cron.yml and remove the playwright stuff (gladly!)
 
 ## Installation
 

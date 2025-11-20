@@ -26,7 +26,7 @@ jobs:
         run: uv sync --locked --no-editable --no-dev
 
       - name: Run bot
-        run: uv run python src/psrt_ghsa_bot/app.py
+        run: uv run python src/psrt_ghsa_bot/api_app.py
         env:
           GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
