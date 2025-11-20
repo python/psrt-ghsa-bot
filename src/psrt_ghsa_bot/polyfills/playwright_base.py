@@ -221,9 +221,10 @@ class GitHubPlaywrightClient:
                 otp_code = totp.now()
                 logger.info("Using OTP code for 2FA...")
 
+                # FIX: Fill the OTP code - GitHub auto-submits when a valid 6-digit code is entered
                 self.page.locator('input[name="app_otp"]').fill(otp_code)
-                self.page.locator('button[type="submit"]:has-text("Verify")').click()
-                self.page.wait_for_timeout(3000)
+                # Wait for GitHub to auto-submit and navigate away from 2FA page
+                self.page.wait_for_url("https://github.com/**", wait_until="domcontentloaded", timeout=10000)
 
             except ImportError:
                 msg = "2FA required but pyotp not installed. did you 'uv sync' the project?"
