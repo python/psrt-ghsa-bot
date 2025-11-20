@@ -67,4 +67,5 @@ There is a [`scripts/`](scripts/) directory with some local dev scripts, namely 
 set up an organization with all the things needed to develop (TODO: it doesn't actually do anything yet.)
 
 The idea behind the bootstrap_org.py is that it will:
-- Take your org 
+- Take your test org, set up a `psrt` (or whatever) team, create a repo with some GHSA, then comment, read the comments, etc.
+This helps more from the integration testing side of things without doing it all in some public, busy repo like `python/CPython` :)
