@@ -20,5 +20,6 @@ def setup_logging(level: int = logging.INFO) -> None:
     )
 
     # set these higher so they arent noiys..
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("playwright").setLevel(logging.WARNING)
     logging.getLogger("githubkit").setLevel(logging.WARNING)
