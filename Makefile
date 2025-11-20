@@ -30,9 +30,6 @@ test:  ## Run tests
 
 ci: lint fmt type-check test  ## Run everything
 
-app:  ## Run the app
-	@uv run python app.py
-
 ### --- Bot Things
 ### These all reequire .env file with the vars set based on .env.example!
 cron-run:  ## Run the cron bot (app.py)
