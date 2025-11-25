@@ -32,7 +32,7 @@ like:
 That's why there is this weird split between the cron.yml and playwright.yml. As API things
 are added, we can move more into app.py/cron.yml and remove the playwright stuff (gladly!)
 
-## Notes
+## Installation
 
 The GitHub app (API-related activities) **MUST** be installed in all GitHub organizations
 you want scanned. The GitHub user (`GH_BOT_USERNAME`, used by Playwright) **MUST** have access to the repos that
