@@ -10,24 +10,29 @@ import subprocess
 import sys
 
 from psrt_ghsa_bot._monitoring import capture_checkin, init_sentry, report_workflow_failure
+from psrt_ghsa_bot.config import (
+    MONITOR_SLUG_GHSA,
+    MONITOR_SLUG_HEALTH,
+    MONITOR_SLUG_PLAYWRIGHT,
+)
 
 logger = logging.getLogger(__name__)
+
+WORKFLOWS_TO_CHECK = [
+    {"name": "PSRT GHSA Bot", "file": "cron.yml", "monitor_slug": MONITOR_SLUG_GHSA},
+    {"name": "PSRT Playwright Bot", "file": "playwright.yml", "monitor_slug": MONITOR_SLUG_PLAYWRIGHT},
+]
 
 
 def check_workflow_health() -> None:
     """Check the health of configured workflows and report to Sentry."""
     init_sentry()
 
-    capture_checkin("psrt-health-monitor", "in_progress")
-
-    workflows_to_check = [
-        {"name": "PSRT GHSA Bot", "file": "cron.yml", "monitor_slug": "psrt-ghsa-cron"},
-        {"name": "PSRT Playright Bot", "file": "playwright.yml", "monitor_slug": "psrt-playwright-cron"},
-    ]
+    capture_checkin(MONITOR_SLUG_HEALTH, "in_progress")
 
     all_healthy = True
 
-    for workflow in workflows_to_check:
+    for workflow in WORKFLOWS_TO_CHECK:
         logger.info("Checking workflow: %s", workflow["name"])
 
         result = subprocess.run(  # noqa: S603
@@ -80,10 +85,10 @@ def check_workflow_health() -> None:
             all_healthy = False
 
     if all_healthy:
-        capture_checkin("psrt-health-monitor", "ok")
+        capture_checkin(MONITOR_SLUG_HEALTH, "ok")
         logger.info("All workflows healthy")
     else:
-        capture_checkin("psrt-health-monitor", "error")
+        capture_checkin(MONITOR_SLUG_HEALTH, "error")
         logger.error("Some workflows are unhealthy")
         sys.exit(1)
 
