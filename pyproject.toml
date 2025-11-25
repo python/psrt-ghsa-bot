@@ -98,5 +98,5 @@ indent-style = "space"
 convention = "google"
 
 [tool.pytest.ini_options]
-addopts = "-p no:anyio --ignore=tests/integration"
-testpaths = ["tests"]
+addopts = "-p no:anyio"
+testpaths = ["tests/unit"]
