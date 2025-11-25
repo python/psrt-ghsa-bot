@@ -2,12 +2,12 @@
 
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 from githubkit import GitHub, TokenAuthStrategy
 
+from conftest import requires_playwright_auth
 from psrt_ghsa_bot.polyfills import (
     GHSAComment,
     GitHubPlaywrightClient,
@@ -17,8 +17,6 @@ from psrt_ghsa_bot.polyfills import (
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-
-PLAYWRIGHT_FULL = Path("tests/PLAYWRIGHT_FULL.test").exists()
 
 
 @pytest.fixture
@@ -112,10 +110,7 @@ def test_get_ghsa_comments_basic(authenticated_client: GitHubPlaywrightClient) -
     #     assert comment.created_at <= comment.updated_at
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_ghsa_comment_dataclass_repr() -> None:
     """Test the GHSAComment repr method."""
     comment = GHSAComment(
@@ -134,10 +129,7 @@ def test_ghsa_comment_dataclass_repr() -> None:
     assert "2024-01-01 12:00:00" in repr_str
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_get_ghsa_comments_with_no_comments(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test retrieval from a GHSA with no comments."""
     # Create or find a GHSA with zero comments
@@ -153,10 +145,7 @@ def test_get_ghsa_comments_with_no_comments(authenticated_client: GitHubPlaywrig
     assert isinstance(comments, list)
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_get_ghsa_comments_bot_detection(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test that bot comments are properly detected."""
     comments = get_ghsa_comments(
@@ -173,10 +162,7 @@ def test_get_ghsa_comments_bot_detection(authenticated_client: GitHubPlaywrightC
         assert "bot" in bot_comment.author.lower() or "[bot]" in bot_comment.author
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_get_ghsa_comments_chronological_order(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test that comments are returned in chronological order."""
     comments = get_ghsa_comments(
@@ -211,10 +197,7 @@ def test_ghsa_comment_dataclass_fields() -> None:
     assert comment.is_bot_comment is False
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_get_ghsa_comments_error_handling_invalid_ghsa() -> None:
     """Test error handling for invalid GHSA ID."""
     with GitHubPlaywrightClient(headless=True) as client:
@@ -279,10 +262,7 @@ def test_post_ghsa_comment_basic(authenticated_client: GitHubPlaywrightClient, t
     assert len(comment_id) > 0
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_post_and_read_comment_roundtrip(authenticated_client: GitHubPlaywrightClient) -> None:
     """Test posting a comment and then reading it back."""
     unique_text = f"Roundtrip test {datetime.now().timestamp()}"

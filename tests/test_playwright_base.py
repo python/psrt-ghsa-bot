@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import requires_playwright_auth
 from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
-
-PLAYWRIGHT_FULL = Path("tests/PLAYWRIGHT_FULL.test").exists()
 
 
 @pytest.fixture
@@ -40,10 +39,7 @@ def test_navigate_to_public_page(client: GitHubPlaywrightClient) -> None:
         assert "github.com" in client.page.url
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_authentication_with_saved_state(client: GitHubPlaywrightClient) -> None:
     """Test authentication using saved state from manual login."""
     with client:
@@ -51,10 +47,7 @@ def test_authentication_with_saved_state(client: GitHubPlaywrightClient) -> None
         assert client._is_authenticated()
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient) -> None:
     """Test navigation to a GHSA page (requires authentication)."""
     with client:
@@ -67,10 +60,7 @@ def test_navigate_to_ghsa_page(client: GitHubPlaywrightClient) -> None:
         assert "security/advisories" in client.page.url
 
 
-@pytest.mark.skipif(
-    not (PLAYWRIGHT_FULL and Path("playwright/.auth/github_state.json").exists()),
-    reason="Requires PLAYWRIGHT_FULL.test file and authentication state",
-)
+@requires_playwright_auth
 def test_authentication_state_persistence(client: GitHubPlaywrightClient) -> None:
     """Test that authentication state is saved and can be reused."""
     storage_state_path = Path("playwright/.auth/github_state.json")
