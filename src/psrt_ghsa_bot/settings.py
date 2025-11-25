@@ -90,18 +90,21 @@ class PlaywrightSettings:
 
 @dataclass
 class ReminderSettings:
-    """Reminder and deadline settings."""
+    """Reminder and deadline settings.
+
+    Reminders are sent when an advisory reaches specific age milestones.
+    For example, with DEADLINE_REMINDER_DAYS=[60,30,15,7,3,1], reminders
+    are sent when the advisory is 60, 30, 15, 7, 3, and 1 days old.
+    """
 
     DEFAULT_NOTIFICATION_TEAM: str = "python/psrt"
-    """Team to notify when a GHSA is created."""
-    DEFAULT_DEADLINE_DAYS: int = 90
-    """Days until deadline from creation date."""
-    DEFAULT_WARNING_THRESHOLD_DAYS: int = 14
-    """Days before deadline to send warning."""
-    HOURS_BETWEEN_REMINDERS: int = 23
-    """Minimum hours between daily reminders."""
+    """Team to notify for deadline reminders."""
+    DEADLINE_DAYS: int = 90
+    """Total deadline in days from advisory creation."""
+    DEADLINE_REMINDER_DAYS: tuple[int, ...] = (60, 30, 15, 7, 3, 1)
+    """Days before deadline to send reminders (countdown from deadline)."""
     URGENT_DAYS_THRESHOLD: int = 7
-    """Days threshold for urgent warnings."""
+    """Days threshold for urgent warnings (affects message formatting)."""
 
     @classmethod
     def from_env(cls) -> Self:
