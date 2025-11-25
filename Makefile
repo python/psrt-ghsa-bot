@@ -4,6 +4,8 @@
 help: ## Display this help text for Makefile
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Development
+
 upgrade: ## Upgrade all dependencies to the latest stable versions
 	@uv lock --upgrade
 	@echo "=> Dependencies Updated"
@@ -30,8 +32,9 @@ test:  ## Run tests
 
 ci: lint fmt type-check test  ## Run everything
 
-### --- Bot Things
-### These all reequire .env file with the vars set based on .env.example!
+##@ Live Bot Commands
+### These all require .env file with the vars set based on .env.example!
+
 cron-run:  ## Run the cron bot (app.py)
 	@uv run python -m psrt_ghsa_bot.app
 
