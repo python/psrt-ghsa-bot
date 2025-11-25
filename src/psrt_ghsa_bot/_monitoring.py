@@ -63,9 +63,17 @@ def report_workflow_failure(workflow_name: str, run_id: str, conclusion: str) ->
         workflow_name: Name of the failed workflow
         run_id: GitHub Actions run ID
         conclusion: The conclusion status from GitHub Actions
+
+    Raises:
+        RuntimeError: If GITHUB_REPOSITORY environment variable is not set
     """
     if not settings.monitoring.SENTRY_DSN:
         return
+
+    github_repository = os.environ.get("GITHUB_REPOSITORY")
+    if not github_repository:
+        msg = "GITHUB_REPOSITORY environment variable is required"
+        raise RuntimeError(msg)
 
     sentry_sdk.capture_message(
         f"Workflow '{workflow_name}' failed with status: {conclusion}",
@@ -74,8 +82,6 @@ def report_workflow_failure(workflow_name: str, run_id: str, conclusion: str) ->
             "workflow_name": workflow_name,
             "run_id": run_id,
             "conclusion": conclusion,
-            "workflow_url": (
-                f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'unknown')}/actions/runs/{run_id}"
-            ),
+            "workflow_url": f"https://github.com/{github_repository}/actions/runs/{run_id}",
         },
     )
