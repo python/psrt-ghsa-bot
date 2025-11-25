@@ -1,26 +1,16 @@
 """State management for tracking processed comments and commands.
 
-We don't continuosly run the playwright process, we run it periodiclly in GHA.
-So, we need a state tracking to keep track of the last time we ran the GHA
-so we only process comments for GHSA things that have been created AT or
-AFTER the last tiem we ran.
+We don't continuously run the playwright process, we run it periodically in GHA.
+So, we need state tracking to keep track of the last time we ran so we only
+process comments that have been created AFTER the last time we ran.
 
-We could do a simple file based thing touching an epoch a reading it
-but this tries to rely on gha cache to make it a little faster.
-
-- we store the state in a file in the cache directory
-- we use the cache directory to store the state file
-- state file contains json obj with state including:
-  - date/time we last ran
-  - last comment id we processed
-  - set of commands we've processed
-  - count of commands processed
-- we use the state file to determine what to process afterwards
-- update stat efile AFTER processing this new set
-- 🔁
+Instead of storing all processed command hashes (which grows unbounded),
+we use timestamp-based filtering:
+- Store `last_processed_at` per GHSA
+- Only process comments newer than this timestamp
+- For replay capability, add comment IDs to `commands_to_reprocess`
 """
 
-import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -35,17 +25,13 @@ if TYPE_CHECKING:
 class GHSAState:
     """State for a single GHSA."""
 
-    last_comment_id: str | None = None
     last_processed_at: str | None = None
-    processed_commands: set[str] = field(default_factory=set)
     commands_processed_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
-            "last_comment_id": self.last_comment_id,
             "last_processed_at": self.last_processed_at,
-            "processed_commands": list(self.processed_commands),
             "commands_processed_count": self.commands_processed_count,
         }
 
@@ -53,9 +39,7 @@ class GHSAState:
     def from_dict(cls, data: Mapping[str, Any]) -> GHSAState:
         """Creat from dict."""
         return cls(
-            last_comment_id=data.get("last_comment_id"),
             last_processed_at=data.get("last_processed_at"),
-            processed_commands=set(data.get("processed_commands", [])),
             commands_processed_count=data.get("commands_processed_count", 0),
         )
 
@@ -66,12 +50,14 @@ class BotState:
 
     last_run: str | None = None
     ghsas: dict[str, GHSAState] = field(default_factory=dict)
+    commands_to_reprocess: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
             "last_run": self.last_run,
             "ghsas": {key: state.to_dict() for key, state in self.ghsas.items()},
+            "commands_to_reprocess": self.commands_to_reprocess,
         }
 
     @classmethod
@@ -80,6 +66,7 @@ class BotState:
         return cls(
             last_run=data.get("last_run"),
             ghsas={key: GHSAState.from_dict(value) for key, value in data.get("ghsas", {}).items()},
+            commands_to_reprocess=data.get("commands_to_reprocess", []),
         )
 
 
@@ -137,62 +124,70 @@ class StateManager:
             state.ghsas[ghsa_id] = GHSAState()
         return state.ghsas[ghsa_id]
 
-    def is_command_processed(self, ghsa_id: str, comment_id: str, command_text: str, author: str) -> bool:
-        """Check if a command has been processed.
-
-        TODO: so, if someone edits their comment will it change the hasH?
+    def should_process_comment(self, ghsa_id: str, comment_id: str, comment_created_at: datetime) -> bool:
+        """Check if a comment should be processed based on timestamp.
 
         Args:
             ghsa_id: GHSA identifier
             comment_id: GitHub comment ID
-            command_text: Raw command text
-            author: Comment author username
+            comment_created_at: When the comment was created
 
         Returns:
-            True if command was already processed
+            True if comment should be processed (newer than last run or in reprocess list)
         """
-        ghsa_state = self.get_ghsa_state(ghsa_id)
-        command_hash = self._hash_command(comment_id, command_text, author)
-        return command_hash in ghsa_state.processed_commands
+        state = self.load()
 
-    def mark_command_processed(self, ghsa_id: str, comment_id: str, command_text: str, author: str) -> None:
+        if comment_id in state.commands_to_reprocess:
+            return True
+
+        ghsa_state = self.get_ghsa_state(ghsa_id)
+        if ghsa_state.last_processed_at is None:
+            return True
+
+        last_processed = datetime.fromisoformat(ghsa_state.last_processed_at)
+        return comment_created_at > last_processed
+
+    def mark_command_processed(self, ghsa_id: str, comment_id: str) -> None:
         """Mark a command as processed.
 
         Args:
             ghsa_id: GHSA identifier
             comment_id: GitHub comment ID
-            command_text: Raw command text
-            author: Comment author username
         """
+        state = self.load()
         ghsa_state = self.get_ghsa_state(ghsa_id)
-        command_hash = self._hash_command(comment_id, command_text, author)
-        ghsa_state.processed_commands.add(command_hash)
         ghsa_state.commands_processed_count += 1
-        ghsa_state.last_comment_id = comment_id
         ghsa_state.last_processed_at = datetime.now(UTC).isoformat()
 
-    def _hash_command(self, comment_id: str, command_text: str, author: str) -> str:
-        """Generate unique hash for a command.
+        if comment_id in state.commands_to_reprocess:
+            state.commands_to_reprocess.remove(comment_id)
 
-        Args:
-            comment_id: GitHub comment ID
-            command_text: Raw command text
-            author: Comment author username
-
-        Returns:
-            SHA-256 hash of command components
-        """
-        content = f"{comment_id}:{command_text}:{author}"
-        return hashlib.sha256(content.encode()).hexdigest()[:16]
-
-    def update_ghsa_state(self, ghsa_id: str, last_comment_id: str | None = None) -> None:
+    def update_ghsa_state(self, ghsa_id: str) -> None:
         """Update state for a GHSA after processing.
 
         Args:
             ghsa_id: GHSA identifier
-            last_comment_id: Last processed comment ID
         """
         ghsa_state = self.get_ghsa_state(ghsa_id)
-        if last_comment_id:
-            ghsa_state.last_comment_id = last_comment_id
         ghsa_state.last_processed_at = datetime.now(UTC).isoformat()
+
+    def add_command_to_reprocess(self, comment_id: str) -> None:
+        """Add a comment ID to the reprocess list.
+
+        This allows replaying commands by adding their comment IDs
+        via a PR to the state file.
+
+        Args:
+            comment_id: GitHub comment ID to reprocess
+        """
+        state = self.load()
+        if comment_id not in state.commands_to_reprocess:
+            state.commands_to_reprocess.append(comment_id)
+
+    def get_commands_to_reprocess(self) -> list[str]:
+        """Get list of comment IDs pending reprocessing.
+
+        Returns:
+            List of comment IDs to reprocess
+        """
+        return self.load().commands_to_reprocess.copy()

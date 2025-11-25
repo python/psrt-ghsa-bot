@@ -86,7 +86,7 @@ def process_ghsa_comments(
             logger.debug("No command in comment from @%s", author)
             continue
 
-        if state_manager.is_command_processed(ghsa_key, comment_id, body, author):
+        if not state_manager.should_process_comment(ghsa_key, comment_id, comment.created_at):
             logger.debug("Command already processed: %s from @%s", cmd.action, author)
             continue
 
@@ -94,7 +94,7 @@ def process_ghsa_comments(
         try:
             result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id)
             post_ghsa_comment(playwright_client, owner, repo, ghsa_id, result.message)
-            state_manager.mark_command_processed(ghsa_key, comment_id, body, author)
+            state_manager.mark_command_processed(ghsa_key, comment_id)
             commands_executed += 1
             logger.info("Command executed successfully: %s", cmd.action)
         except Exception:
