@@ -1,5 +1,8 @@
 .DEFAULT_GOAL:=help
 .ONESHELL:
+ACT_INSTALLED := $(shell command -v act 2> /dev/null)
+
+.PHONY: act-check act-list act-ci act-health-check act-playwright act-cron
 
 help: ## Display this help text for Makefile
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -43,3 +46,26 @@ playwright-run:  ## Run playwright bot
 
 health-check:  ## Run health check
 	@uv run python -m psrt_ghsa_bot.health_check
+
+##@ GitHub Actions (Local Testing)
+
+act-check:  ## Check if act is installed
+ifndef ACT_INSTALLED
+	@echo "act is not installed. Install it from: https://nektosact.com/installation/index.html"
+	@exit 1
+endif
+
+act-list: act-check  ## List all available GitHub Actions workflows
+	@act -l
+
+act-ci: act-check  ## Test CI workflow locally using act
+	@act -W .github/workflows/ci.yml
+
+act-health-check: act-check  ## Test health-check workflow locally using act
+	@act -W .github/workflows/health-check.yml
+
+act-playwright: act-check  ## Test playwright workflow locally using act
+	@act -W .github/workflows/playwright.yml
+
+act-cron: act-check  ## Test cron workflow locally using act
+	@act -W .github/workflows/cron.yml
