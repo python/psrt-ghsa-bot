@@ -274,7 +274,10 @@ def _extract_timestamp(element: Locator, timestamp_type: str) -> datetime:
         timestamp_type: "created" or "updated"
 
     Returns:
-        Parsed datetime or current time as fallback
+        Parsed datetime from the element
+
+    Raises:
+        ValueError: If timestamp cannot be extracted from any known selector
     """
     timestamp_selectors = [
         "relative-time",
@@ -290,10 +293,10 @@ def _extract_timestamp(element: Locator, timestamp_type: str) -> datetime:
             if datetime_str:
                 return datetime.fromisoformat(datetime_str)
         except Exception:
-            logger.exception("Failed to get timestamp with selector %s", selector)
+            logger.debug("Selector %s did not match for %s timestamp", selector, timestamp_type)
             continue
 
-    return datetime.now(tz=UTC)
+    raise ValueError(f"Could not extract {timestamp_type} timestamp from comment element")
 
 
 def _is_bot_author(element: Locator, author: str) -> bool:
