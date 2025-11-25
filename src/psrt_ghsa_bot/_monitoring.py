@@ -1,10 +1,13 @@
 """Sentry cron monitoring integration for GH act workflows."""
 
 import os
-from typing import Literal
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import crons
+
+if TYPE_CHECKING:
+    from psrt_ghsa_bot.config import CheckinStatus
 
 
 def init_sentry() -> None:
@@ -21,14 +24,14 @@ def init_sentry() -> None:
 
 def capture_checkin(
     monitor_slug: str,
-    status: Literal["in_progress", "ok", "error"],
+    status: CheckinStatus,
     duration: float | None = None,
 ) -> str | None:
     """Capture a Sentry cron check-in.
 
     Args:
         monitor_slug: The unique identifier for this monitor (e.g., "psrt-ghsa-cron")
-        status: The status of the check-in ("in_progress", "ok", or "error")
+        status: The status of the check-in (STATUS_IN_PROGRESS, STATUS_OK, or STATUS_ERROR)
         duration: Optional duration in seconds for the job execution
 
     Returns:
