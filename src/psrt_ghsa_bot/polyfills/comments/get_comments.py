@@ -6,6 +6,7 @@ automation to extract comment data from the GitHub web UI.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -42,10 +43,10 @@ class GHSAComment:
 
 
 def get_ghsa_comments(
-    client: GitHubPlaywrightClient,
-    owner: str,
-    repo: str,
-    ghsa_id: str,
+        client: GitHubPlaywrightClient,
+        owner: str,
+        repo: str,
+        ghsa_id: str,
 ) -> list[GHSAComment]:
     """Get all comments from a GitHub Security Advisory using Playwright.
 
@@ -305,7 +306,7 @@ def _is_bot_author(element: Locator, author: str) -> bool:
     Returns:
         True if author is a bot
     """
-    if "bot" in author.lower():
+    if author == os.environ.get("GH_BOT_USERNAME", "PSRT-GHSA-Automation"):
         return True
 
     try:
