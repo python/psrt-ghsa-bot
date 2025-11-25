@@ -57,7 +57,13 @@ def check_workflow_health() -> None:
             all_healthy = False
             continue
 
-        runs = json.loads(result.stdout)
+        try:
+            runs = json.loads(result.stdout)
+        except ValueError:
+            logger.warning("Failed to parse workflow runs for %s", workflow["name"])
+            all_healthy = False
+            continue
+
         if not runs:
             logger.warning("No runs found for %s", workflow["name"])
             continue
