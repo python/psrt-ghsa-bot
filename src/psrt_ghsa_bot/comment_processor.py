@@ -55,6 +55,10 @@ def process_ghsa_comments(
         Number of commands executed
     """
     ghsa_key = f"{owner}/{repo}/{ghsa_id}"
+    bot_username = playwright_client.username
+    if not bot_username:
+        msg = "Bot username not configured"
+        raise RuntimeError(msg)
 
     try:
         comments = get_ghsa_comments(playwright_client, owner, repo, ghsa_id)
@@ -76,11 +80,11 @@ def process_ghsa_comments(
         author = comment.author
         body = comment.body
 
-        if author == playwright_client.username:
+        if author == bot_username:
             logger.debug("Skipping bot's own comment: %s", comment_id)
             continue
 
-        cmd = parse_command(body, author, comment_id, playwright_client.username, comment.created_at)
+        cmd = parse_command(body, author, comment_id, bot_username, comment.created_at)
 
         if cmd is None:
             logger.debug("No command in comment from @%s", author)
