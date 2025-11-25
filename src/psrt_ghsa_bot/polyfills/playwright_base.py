@@ -52,7 +52,7 @@ class GitHubPlaywrightClient:
         )
         self.slow_mo = slow_mo
         self.record_video = record_video
-        self.username = os.environ["GH_BOT_USERNAME"]
+        self.username = os.getenv("GH_BOT_USERNAME")
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
