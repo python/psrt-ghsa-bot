@@ -67,21 +67,6 @@ AVAILABLE_COMMANDS: dict[str, CommandInfo] = {
         "example": "publish",
         "aliases": ["release", "complete"],
     },
-    "set-deadline": {
-        "description": "Set custom deadline (in days from advisory creation) for this advisory",
-        "usage": "set-deadline <days>",
-        "example": "set-deadline 60",
-    },
-    "set-warning-days": {
-        "description": "Set how many days before deadline to start sending inactivity warnings",
-        "usage": "set-warning-days <days>",
-        "example": "set-warning-days 14",
-    },
-    "set-team": {
-        "description": "Set the team to notify in inactivity reminders",
-        "usage": "set-team <team>",
-        "example": "set-team python/psrt",
-    },
 }
 
 COMMAND_ALIASES = {
