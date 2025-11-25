@@ -3,9 +3,9 @@
 from pathlib import Path
 
 import pytest
-from tests.integration.conftest import requires_playwright_auth
 
 from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
+from tests.conftest import requires_playwright_auth
 
 
 def test_navigate_to_public_page(client: GitHubPlaywrightClient) -> None:

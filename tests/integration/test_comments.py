@@ -3,13 +3,13 @@
 from datetime import datetime
 
 import pytest
-from tests.integration.conftest import requires_playwright_auth
 
 from psrt_ghsa_bot.polyfills import (
     GitHubPlaywrightClient,
     get_ghsa_comments,
     post_ghsa_comment,
 )
+from tests.conftest import requires_playwright_auth
 
 
 @requires_playwright_auth
