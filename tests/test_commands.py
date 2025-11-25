@@ -3,7 +3,6 @@
 todo: test for auth checks to make sure they are handled properly
 """
 
-import os
 from datetime import UTC, datetime
 
 import pytest
@@ -16,12 +15,13 @@ from psrt_ghsa_bot.commands.parser import (
     is_valid_command,
     parse_command,
 )
+from psrt_ghsa_bot.settings import settings
 
 
 @pytest.fixture
 def bot_username() -> str:
     """Get bot username from environment or use default."""
-    return os.environ.get("GH_BOT_USERNAME", "psrt-ghsabot")
+    return settings.playwright.GH_BOT_USERNAME
 
 
 class TestCommandParsing:

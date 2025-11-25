@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 from playwright.sync_api import Locator
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from psrt_ghsa_bot.settings import settings
+
 if TYPE_CHECKING:
     from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 
@@ -43,10 +45,10 @@ class GHSAComment:
 
 
 def get_ghsa_comments(
-        client: GitHubPlaywrightClient,
-        owner: str,
-        repo: str,
-        ghsa_id: str,
+    client: GitHubPlaywrightClient,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
 ) -> list[GHSAComment]:
     """Get all comments from a GitHub Security Advisory using Playwright.
 
@@ -309,7 +311,7 @@ def _is_bot_author(element: Locator, author: str) -> bool:
     Returns:
         True if author is a bot
     """
-    if author == os.environ.get("GH_BOT_USERNAME", "PSRT-GHSA-Automation"):
+    if author == settings.playwright.GH_BOT_USERNAME:
         return True
 
     try:
