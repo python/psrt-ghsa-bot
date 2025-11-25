@@ -6,9 +6,8 @@ automation to extract comment data from the GitHub web UI.
 """
 
 import logging
-import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from playwright.sync_api import Locator
@@ -298,7 +297,8 @@ def _extract_timestamp(element: Locator, timestamp_type: str) -> datetime:
             logger.debug("Selector %s did not match for %s timestamp", selector, timestamp_type)
             continue
 
-    raise ValueError(f"Could not extract {timestamp_type} timestamp from comment element")
+    msg = f"Could not extract {timestamp_type} timestamp from comment element"
+    raise ValueError(msg)
 
 
 def _is_bot_author(element: Locator, author: str) -> bool:
