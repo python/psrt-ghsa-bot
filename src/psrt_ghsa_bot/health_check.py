@@ -27,10 +27,8 @@ WORKFLOWS_TO_CHECK = [
 def check_workflow_health() -> None:
     """Check the health of configured workflows and report to Sentry."""
     init_sentry()
-
     capture_checkin(MONITOR_SLUG_HEALTH, "in_progress")
-
-    all_healthy = True
+    workflow_statuses = {workflow["file"]: False for workflow in WORKFLOWS_TO_CHECK}
 
     for workflow in WORKFLOWS_TO_CHECK:
         logger.info("Checking workflow: %s", workflow["file"])
@@ -54,14 +52,12 @@ def check_workflow_health() -> None:
 
         if result.returncode != 0:
             logger.warning("Failed to get workflow runs: %s", result.stderr)
-            all_healthy = False
             continue
 
         try:
             runs = json.loads(result.stdout)
         except ValueError:
             logger.warning("Failed to parse workflow runs for %s", workflow["file"])
-            all_healthy = False
             continue
 
         if not runs:
@@ -82,15 +78,14 @@ def check_workflow_health() -> None:
             logger.error("Workflow failed with status: %s", conclusion)
             report_workflow_failure(workflow["file"], str(run_id), conclusion)
             capture_checkin(workflow["monitor_slug"], "error")
-            all_healthy = False
         elif conclusion == "success":
             logger.info("Workflow succeeded")
             capture_checkin(workflow["monitor_slug"], "ok")
+            workflow_statuses[workflow["file"]] = True
         else:
             logger.warning("Unexpected conclusion: %s", conclusion)
-            all_healthy = False
 
-    if all_healthy:
+    if all(workflow_statuses.values()):
         capture_checkin(MONITOR_SLUG_HEALTH, "ok")
         logger.info("All workflows healthy")
     else:
