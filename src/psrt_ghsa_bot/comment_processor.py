@@ -85,33 +85,6 @@ def cleanup_closed_advisories(
     return len(entries_to_remove)
 
 
-def update_activity_tracking(
-    comments: list,
-    state_manager: StateManager,
-    ghsa_key: str,
-    bot_username: str,
-) -> None:
-    """Update last activity timestamp from non-bot comments.
-
-    Args:
-        comments: List of comments
-        state_manager: State manager instance
-        ghsa_key: GHSA key (owner/repo/ghsa_id)
-        bot_username: Bot's username to filter out
-    """
-    ghsa_state = state_manager.get_ghsa_state(ghsa_key)
-
-    latest_non_bot_comment = None
-    for comment in reversed(comments):
-        if comment.author != bot_username and not comment.is_bot_comment:
-            latest_non_bot_comment = comment
-            break
-
-    if latest_non_bot_comment:
-        ghsa_state.last_activity_at = latest_non_bot_comment.created_at.isoformat()
-        state_manager.save()
-
-
 def process_ghsa_comments(
     github: GitHub,
     playwright_client: GitHubPlaywrightClient,
@@ -150,8 +123,6 @@ def process_ghsa_comments(
 
     logger.info("Processing %d comments on %s", len(comments), ghsa_id)
 
-    update_activity_tracking(comments, state_manager, ghsa_key, playwright_client.username)
-
     commands_executed = 0
     for comment in comments:
         comment_id = comment.id
@@ -174,7 +145,7 @@ def process_ghsa_comments(
 
         logger.info("Executing command: %s from @%s on %s", cmd.action, author, ghsa_id)
         try:
-            result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id, state_manager)
+            result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id)
             post_ghsa_comment(playwright_client, owner, repo, ghsa_id, result.message)
             state_manager.mark_command_processed(ghsa_key, comment_id)
             commands_executed += 1
@@ -312,10 +283,10 @@ def main() -> None:
                 except Exception:
                     logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
 
-        logger.info("Checking for inactivity reminders...")
+        logger.info("Checking for deadline reminders...")
         reminders_sent = check_and_send_reminders(github, playwright_client, all_advisories, state_manager)
         stats.reminders_sent = reminders_sent
-        logger.info("Sent %d inactivity reminders", reminders_sent)
+        logger.info("Sent %d deadline reminders", reminders_sent)
 
         logger.info("=" * 50)
         logger.info("Processing Summary:")
