@@ -22,7 +22,7 @@ def check_workflow_health() -> None:
 
     workflows_to_check = [
         {"name": "PSRT GHSA Bot", "file": "cron.yml", "monitor_slug": "psrt-ghsa-cron"},
-        {"name": "PSRT Playright Bot", "file": "playwright.yml", "monitor_slug": "psrt-playwright-cron"}, # noqa: ERA001, E501
+        {"name": "PSRT Playright Bot", "file": "playwright.yml", "monitor_slug": "psrt-playwright-cron"},
     ]
 
     all_healthy = True
