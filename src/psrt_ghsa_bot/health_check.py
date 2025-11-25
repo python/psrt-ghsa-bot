@@ -14,6 +14,9 @@ from psrt_ghsa_bot.config import (
     MONITOR_SLUG_GHSA,
     MONITOR_SLUG_HEALTH,
     MONITOR_SLUG_PLAYWRIGHT,
+    STATUS_ERROR,
+    STATUS_IN_PROGRESS,
+    STATUS_OK,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,10 +30,8 @@ WORKFLOWS_TO_CHECK = [
 def check_workflow_health() -> None:
     """Check the health of configured workflows and report to Sentry."""
     init_sentry()
-
-    capture_checkin(MONITOR_SLUG_HEALTH, "in_progress")
-
-    all_healthy = True
+    capture_checkin(MONITOR_SLUG_HEALTH, STATUS_IN_PROGRESS)
+    workflow_statuses = {workflow["file"]: False for workflow in WORKFLOWS_TO_CHECK}
 
     for workflow in WORKFLOWS_TO_CHECK:
         logger.info("Checking workflow: %s", workflow["file"])
@@ -54,14 +55,12 @@ def check_workflow_health() -> None:
 
         if result.returncode != 0:
             logger.warning("Failed to get workflow runs: %s", result.stderr)
-            all_healthy = False
             continue
 
         try:
             runs = json.loads(result.stdout)
         except ValueError:
             logger.warning("Failed to parse workflow runs for %s", workflow["file"])
-            all_healthy = False
             continue
 
         if not runs:
@@ -81,20 +80,19 @@ def check_workflow_health() -> None:
         if conclusion in ["failure", "timed_out", "cancelled"]:
             logger.error("Workflow failed with status: %s", conclusion)
             report_workflow_failure(workflow["file"], str(run_id), conclusion)
-            capture_checkin(workflow["monitor_slug"], "error")
-            all_healthy = False
+            capture_checkin(workflow["monitor_slug"], STATUS_ERROR)
         elif conclusion == "success":
             logger.info("Workflow succeeded")
-            capture_checkin(workflow["monitor_slug"], "ok")
+            capture_checkin(workflow["monitor_slug"], STATUS_OK)
+            workflow_statuses[workflow["file"]] = True
         else:
             logger.warning("Unexpected conclusion: %s", conclusion)
-            all_healthy = False
 
-    if all_healthy:
-        capture_checkin(MONITOR_SLUG_HEALTH, "ok")
+    if all(workflow_statuses.values()):
+        capture_checkin(MONITOR_SLUG_HEALTH, STATUS_OK)
         logger.info("All workflows healthy")
     else:
-        capture_checkin(MONITOR_SLUG_HEALTH, "error")
+        capture_checkin(MONITOR_SLUG_HEALTH, STATUS_ERROR)
         logger.error("Some workflows are unhealthy")
         sys.exit(1)
 

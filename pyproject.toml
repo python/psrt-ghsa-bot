@@ -99,3 +99,4 @@ convention = "google"
 
 [tool.pytest.ini_options]
 addopts = "-p no:anyio"
+testpaths = ["tests/unit"]
