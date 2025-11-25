@@ -1,13 +1,12 @@
-"""Inactivity reminder system for GHSA advisories approaching deadlines.
+"""Milestone-based reminder system for GHSA advisories.
 
-TODO: I think i have a lingering questions on this..
-- if it hits deadline what do we do even if it is active?
-- do we need a playwright polyfill to close the advisory if inactive for the full 90 days
- or do we just drop from state.json?
+Reminders are sent based on advisory age relative to the deadline.
+For example, with DEADLINE_DAYS=90 and DEADLINE_REMINDER_DAYS=[60,30,15,7,3,1],
+reminders are sent when there are 60, 30, 15, 7, 3, and 1 days remaining.
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from psrt_ghsa_bot.polyfills.comments.post_comment import post_ghsa_comment
@@ -23,91 +22,58 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def calculate_deadline(created_at_str: str, deadline_days: int | None) -> datetime:
-    """Calculate deadline for an advisory.
+def get_days_until_deadline(created_at_str: str, current_time: datetime) -> int:
+    """Calculate days remaining until deadline.
 
     Args:
         created_at_str: ISO 8601 timestamp of advisory creation
-        deadline_days: Custom deadline in days, or None for default
-
-    Returns:
-        Deadline datetime
-    """
-    created_at = datetime.fromisoformat(created_at_str)
-    days = deadline_days if deadline_days is not None else settings.reminders.DEFAULT_DEADLINE_DAYS
-    return created_at + timedelta(days=days)
-
-
-def should_send_reminder(
-    ghsa_state: GHSAState,
-    advisory_created_at: str,
-    current_time: datetime,
-) -> tuple[bool, int]:
-    """Check if an inactivity reminder should be sent.
-
-    Args:
-        ghsa_state: State object for the advisory
-        advisory_created_at: ISO 8601 timestamp of advisory creation
         current_time: Current time for comparison
 
     Returns:
-        Tuple of (should_send, days_until_deadline)
+        Days until deadline (negative if past deadline)
     """
-    deadline = calculate_deadline(advisory_created_at, ghsa_state.deadline_days)
-    days_until_deadline = (deadline - current_time).days
+    created_at = datetime.fromisoformat(created_at_str)
+    advisory_age_days = (current_time - created_at).days
+    return settings.reminders.DEADLINE_DAYS - advisory_age_days
 
-    if days_until_deadline < 0:
-        return False, days_until_deadline
 
-    warning_threshold = (
-        ghsa_state.warning_threshold_days
-        if ghsa_state.warning_threshold_days is not None
-        else settings.reminders.DEFAULT_WARNING_THRESHOLD_DAYS
-    )
+def get_pending_reminder_day(
+    ghsa_state: GHSAState,
+    days_until_deadline: int,
+) -> int | None:
+    """Check if a milestone reminder should be sent.
 
-    if days_until_deadline > warning_threshold:
-        return False, days_until_deadline
+    Args:
+        ghsa_state: State object for the advisory
+        days_until_deadline: Days remaining until deadline
 
-    if ghsa_state.last_activity_at is None:
-        return True, days_until_deadline
-
-    last_activity = datetime.fromisoformat(ghsa_state.last_activity_at)
-    days_since_activity = (current_time - last_activity).days
-
-    if days_since_activity < warning_threshold:
-        return False, days_until_deadline
-
-    if ghsa_state.last_reminder_sent_at is not None:
-        last_reminder = datetime.fromisoformat(ghsa_state.last_reminder_sent_at)
-        hours_since_reminder = (current_time - last_reminder).total_seconds() / 3600
-        if hours_since_reminder < settings.reminders.HOURS_BETWEEN_REMINDERS:
-            return False, days_until_deadline
-
-    return True, days_until_deadline
+    Returns:
+        The milestone day to remind for, or None if no reminder needed
+    """
+    for milestone_day in settings.reminders.DEADLINE_REMINDER_DAYS:
+        if days_until_deadline <= milestone_day and milestone_day not in ghsa_state.reminders_sent_at_days:
+            return milestone_day
+    return None
 
 
 def format_reminder_message(
     ghsa_id: str,
     days_until_deadline: int,
-    days_since_activity: int | None,
-    notification_team: str | None,
 ) -> str:
     """Format the reminder comment message.
 
     Args:
         ghsa_id: GHSA identifier
-        days_until_deadline: Number of days remaining until deadline
-        days_since_activity: Number of days since last activity, or None
-        notification_team: Team to mention, or None for default
+        days_until_deadline: Days remaining until deadline
 
     Returns:
         Formatted markdown message
     """
-    team = notification_team if notification_team is not None else settings.reminders.DEFAULT_NOTIFICATION_TEAM
+    team = settings.reminders.DEFAULT_NOTIFICATION_TEAM
 
-    if days_until_deadline == 0:
-        urgency = "🚨 **URGENT**"
-        deadline_msg = "The deadline is **today**!"
+    if days_until_deadline <= 0:
+        urgency = "🚨 **DEADLINE REACHED**"
+        deadline_msg = "The 90-day deadline has been reached!"
     elif days_until_deadline == 1:
         urgency = "🚨 **URGENT**"
         deadline_msg = "The deadline is **tomorrow**!"
@@ -116,22 +82,17 @@ def format_reminder_message(
         deadline_msg = f"Only **{days_until_deadline} days** remain until the deadline!"
     else:
         urgency = "⏰ **Reminder**"
-        deadline_msg = f"**{days_until_deadline} days** remain until the deadline."
-
-    activity_msg = ""
-    if days_since_activity is not None and days_since_activity > 0:
-        activity_msg = f"\n\nThis advisory has had no activity for **{days_since_activity} days**."
+        deadline_msg = f"**{days_until_deadline} days** remain until the 90-day deadline."
 
     return (
-        f"{urgency}: Inactivity Deadline Approaching\n\n"
+        f"{urgency}: Advisory Deadline Approaching\n\n"
         f"@{team}\n\n"
         f"**Advisory:** {ghsa_id}\n"
-        f"{deadline_msg}{activity_msg}\n\n"
+        f"{deadline_msg}\n\n"
         f"**Action Required:**\n"
         f"- Review the advisory status\n"
         f"- Post an update or comment to indicate progress\n"
-        f"- Use bot commands to manage CVE assignment or publication\n\n"
-        f"_This reminder will continue daily until activity is detected or the deadline is reached._"
+        f"- Use bot commands to manage CVE assignment or publication"
     )
 
 
@@ -141,7 +102,7 @@ def check_and_send_reminders(
     advisories: list[dict],
     state_manager: StateManager,
 ) -> int:
-    """Check all active advisories and send reminders if needed.
+    """Check all active advisories and send milestone reminders if needed.
 
     Args:
         github: GitHub API client
@@ -163,43 +124,26 @@ def check_and_send_reminders(
         ghsa_state = state_manager.get_ghsa_state(ghsa_key)
 
         try:
-            should_send, days_until_deadline = should_send_reminder(
-                ghsa_state,
-                advisory["created_at"],
-                current_time,
-            )
+            days_until_deadline = get_days_until_deadline(advisory["created_at"], current_time)
+            milestone_day = get_pending_reminder_day(ghsa_state, days_until_deadline)
 
-            if not should_send:
+            if milestone_day is None:
                 continue
 
-            days_since_activity = None
-            if ghsa_state.last_activity_at is not None:
-                last_activity = datetime.fromisoformat(ghsa_state.last_activity_at)
-                days_since_activity = (current_time - last_activity).days
-
-            message = format_reminder_message(
-                ghsa_id,
-                days_until_deadline,
-                days_since_activity,
-                ghsa_state.notification_team,
-            )
-
-            post_ghsa_comment(
-                playwright_client,
-                owner,
-                repo,
-                ghsa_id,
-                message,
-            )
-
-            ghsa_state.last_reminder_sent_at = current_time.isoformat()
-            state_manager.save()
-
             logger.info(
-                "Sent reminder for %s (%d days until deadline)",
+                "Sending %d-day reminder for %s (%d days remaining)",
+                milestone_day,
                 ghsa_key,
                 days_until_deadline,
             )
+
+            message = format_reminder_message(ghsa_id, days_until_deadline)
+
+            post_ghsa_comment(playwright_client, owner, repo, ghsa_id, message)
+
+            ghsa_state.reminders_sent_at_days.add(milestone_day)
+            state_manager.save()
+
             reminders_sent += 1
 
         except Exception:
