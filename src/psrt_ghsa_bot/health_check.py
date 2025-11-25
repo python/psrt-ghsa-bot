@@ -19,8 +19,8 @@ from psrt_ghsa_bot.config import (
 logger = logging.getLogger(__name__)
 
 WORKFLOWS_TO_CHECK = [
-    {"name": "PSRT GHSA Bot", "file": "cron.yml", "monitor_slug": MONITOR_SLUG_GHSA},
-    {"name": "PSRT Playwright Bot", "file": "playwright.yml", "monitor_slug": MONITOR_SLUG_PLAYWRIGHT},
+    {"file": "cron.yml", "monitor_slug": MONITOR_SLUG_GHSA},
+    {"file": "playwright.yml", "monitor_slug": MONITOR_SLUG_PLAYWRIGHT},
 ]
 
 
@@ -33,7 +33,7 @@ def check_workflow_health() -> None:
     all_healthy = True
 
     for workflow in WORKFLOWS_TO_CHECK:
-        logger.info("Checking workflow: %s", workflow["name"])
+        logger.info("Checking workflow: %s", workflow["file"])
 
         result = subprocess.run(  # noqa: S603
             [  # noqa: S607
@@ -60,17 +60,17 @@ def check_workflow_health() -> None:
         try:
             runs = json.loads(result.stdout)
         except ValueError:
-            logger.warning("Failed to parse workflow runs for %s", workflow["name"])
+            logger.warning("Failed to parse workflow runs for %s", workflow["file"])
             all_healthy = False
             continue
 
         if not runs:
-            logger.warning("No runs found for %s", workflow["name"])
+            logger.warning("No runs found for %s", workflow["file"])
             continue
 
         completed_runs = [r for r in runs if r["status"] == "completed"]
         if not completed_runs:
-            logger.info("No completed runs yet for %s", workflow["name"])
+            logger.info("No completed runs yet for %s", workflow["file"])
             continue
 
         latest_run = completed_runs[0]
@@ -80,7 +80,7 @@ def check_workflow_health() -> None:
 
         if conclusion in ["failure", "timed_out", "cancelled"]:
             logger.error("Workflow failed with status: %s", conclusion)
-            report_workflow_failure(workflow["name"], str(run_id), conclusion)
+            report_workflow_failure(workflow["file"], str(run_id), conclusion)
             capture_checkin(workflow["monitor_slug"], "error")
             all_healthy = False
         elif conclusion == "success":
