@@ -216,7 +216,7 @@ def get_unknown_command_response(action: str, bot_username: str | None = None) -
         Formatted error message with help text
     """
     if bot_username is None:
-        bot_username = os.environ.get("GH_BOT_USERNAME", "psrt-ghsabot")
+        bot_username = os.environ.get("GH_BOT_USERNAME", "PSRT-GHSA-Automation")
 
     available = ", ".join(f"`{cmd}`" for cmd in AVAILABLE_COMMANDS)
 
