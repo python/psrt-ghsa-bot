@@ -107,7 +107,7 @@ def main() -> None:
     installations = github.rest.paginate(
         github.rest.apps.list_installations,
     )
-    for _installation_count, installation_data in enumerate(installations, start=1):
+    for installation_data in installations:
         installation_github = github.with_auth(
             github.auth.as_installation(installation_data.id),
         )
