@@ -2,7 +2,9 @@
 .ONESHELL:
 ACT_INSTALLED := $(shell command -v act 2> /dev/null)
 
+.PHONY: help upgrade lint fmt fmt-check type-check ty check test ci
 .PHONY: act-check act-list act-ci act-health-check act-playwright act-cron
+.PHONY: cron playwright health-check
 
 help: ## Display this help text for Makefile
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -35,18 +37,6 @@ test:  ## Run tests
 
 ci: lint fmt type-check test  ## Run everything
 
-##@ Live Bot Commands
-### These all require .env file with the vars set based on .env.example!
-
-cron-run:  ## Run the cron bot (app.py)
-	@uv run python -m psrt_ghsa_bot.app
-
-playwright-run:  ## Run playwright bot
-	@uv run python -m psrt_ghsa_bot.comment_processor
-
-health-check:  ## Run health check
-	@uv run python -m psrt_ghsa_bot.health_check
-
 ##@ GitHub Actions (Local Testing)
 
 act-check:  ## Check if act is installed
@@ -69,3 +59,15 @@ act-playwright: act-check  ## Test playwright workflow locally using act
 
 act-cron: act-check  ## Test cron workflow locally using act
 	@act -W .github/workflows/cron.yml
+
+##@ Live Bot Commands
+### These all require .env file with the vars set based on .env.example!
+
+cron:  ## Run the cron bot (app.py)
+	@uv run python -m psrt_ghsa_bot.app
+
+playwright:  ## Run playwright bot
+	@uv run python -m psrt_ghsa_bot.comment_processor
+
+health-check:  ## Run health check
+	@uv run python -m psrt_ghsa_bot.health_check
