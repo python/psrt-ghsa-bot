@@ -16,7 +16,6 @@ from psrt_ghsa_bot.api_app import reserve_one_cve
 from psrt_ghsa_bot.commands.authorization import AuthorizationResult, is_authorized
 from psrt_ghsa_bot.commands.parser import Command, get_help_text, get_unknown_command_response
 from psrt_ghsa_bot.settings import settings
-from psrt_ghsa_bot.state import StateManager
 
 if TYPE_CHECKING:
     from githubkit import GitHub
@@ -43,7 +42,6 @@ def execute_command(
     owner: str,
     repo: str,
     ghsa_id: str,
-    state_manager: StateManager | None = None,
 ) -> CommandResult:
     """Execute a parsed command.
 
@@ -59,7 +57,6 @@ def execute_command(
         owner: Repository owner
         repo: Repository name
         ghsa_id: GHSA identifier
-        state_manager: State manager instance (optional, creates new if None)
 
     Returns:
         CommandResult with success status and response message
@@ -84,18 +81,6 @@ def execute_command(
 
     if cmd.action == "publish":
         return _handle_publish(cmd, github, owner, repo, ghsa_id)
-
-    if state_manager is None:
-        state_manager = StateManager()
-
-    if cmd.action == "set-deadline":
-        return _handle_set_deadline(cmd, owner, repo, ghsa_id, state_manager)
-
-    if cmd.action == "set-warning-days":
-        return _handle_set_warning_days(cmd, owner, repo, ghsa_id, state_manager)
-
-    if cmd.action == "set-team":
-        return _handle_set_team(cmd, owner, repo, ghsa_id, state_manager)
 
     return CommandResult(
         success=False,
