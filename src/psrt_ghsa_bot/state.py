@@ -27,22 +27,15 @@ class GHSAState:
 
     last_processed_at: str | None = None
     commands_processed_count: int = 0
-    last_activity_at: str | None = None
-    deadline_days: int | None = None
-    warning_threshold_days: int | None = None
-    notification_team: str | None = None
-    last_reminder_sent_at: str | None = None
+    reminders_sent_at_days: set[int] = field(default_factory=set)
+    """Set of 'days until deadline' values when reminders were sent."""
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
             "last_processed_at": self.last_processed_at,
             "commands_processed_count": self.commands_processed_count,
-            "last_activity_at": self.last_activity_at,
-            "deadline_days": self.deadline_days,
-            "warning_threshold_days": self.warning_threshold_days,
-            "notification_team": self.notification_team,
-            "last_reminder_sent_at": self.last_reminder_sent_at,
+            "reminders_sent_at_days": sorted(self.reminders_sent_at_days),
         }
 
     @classmethod
@@ -51,11 +44,7 @@ class GHSAState:
         return cls(
             last_processed_at=data.get("last_processed_at"),
             commands_processed_count=data.get("commands_processed_count", 0),
-            last_activity_at=data.get("last_activity_at"),
-            deadline_days=data.get("deadline_days"),
-            warning_threshold_days=data.get("warning_threshold_days"),
-            notification_team=data.get("notification_team"),
-            last_reminder_sent_at=data.get("last_reminder_sent_at"),
+            reminders_sent_at_days=set(data.get("reminders_sent_at_days", [])),
         )
 
 
