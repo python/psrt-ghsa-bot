@@ -118,7 +118,11 @@ def check_and_send_reminders(
 
     for advisory in advisories:
         ghsa_id = advisory["ghsa_id"]
-        owner, repo = advisory.get("repository", {}).get("full_name", "/").split("/", 1)
+        repository = advisory.get("repository")
+        if not repository or not repository.get("full_name"):
+            logger.error("Advisory %s has no repository, skipping", ghsa_id)
+            continue
+        owner, repo = repository["full_name"].split("/", 1)
         ghsa_key = f"{owner}/{repo}/{ghsa_id}"
 
         ghsa_state = state_manager.get_ghsa_state(ghsa_key)
