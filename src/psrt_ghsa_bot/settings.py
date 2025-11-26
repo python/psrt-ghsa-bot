@@ -25,6 +25,8 @@ def _load_from_env[T](cls: type[T]) -> T:
         if env_value is not None:
             if field.type is int:
                 kwargs[field.name] = int(env_value)
+            elif field.type is bool:
+                kwargs[field.name] = env_value.lower() in ("true", "1", "yes")
             elif field.type is Path:
                 kwargs[field.name] = Path(env_value)
             else:
@@ -81,6 +83,8 @@ class PlaywrightSettings:
     """GitHub username for the bot."""
     GH_AUTH_STATE_PATH: Path = Path(f"{BASE_DIR}/playwright/.auth/github_state.json")
     """Path to Playwright auth state file."""
+    DISABLE_COMMENTING: bool = False
+    """Disable comment POSTING (not reading)."""
 
     @classmethod
     def from_env(cls) -> Self:
