@@ -15,7 +15,7 @@ from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 from psrt_ghsa_bot.reminders import check_and_send_reminders
 from psrt_ghsa_bot.settings import settings
 from psrt_ghsa_bot.state import StateManager
-from psrt_ghsa_bot.utils.github import get_github_client
+from psrt_ghsa_bot.utils.github import get_github_client, iter_installation_repos
 
 if TYPE_CHECKING:
     from githubkit import GitHub
@@ -68,28 +68,20 @@ def cleanup_closed_advisories(
     """
     state = state_manager.load()
     active_advisories = set()
-    installations = github.rest.paginate(github.rest.apps.list_installations)
 
-    for installation_data in installations:
-        installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
-        repos = installation_github.rest.paginate(
-            installation_github.rest.apps.list_repos_accessible_to_installation,
-            map_func=lambda r: r.parsed_data.repositories,
-        )
+    for installation_github, repo in iter_installation_repos(github):
+        owner = repo.owner.login
+        repo_name = repo.name
 
-        for repo in repos:
-            owner = repo.owner.login
-            repo_name = repo.name
-
-            try:
-                advisories = list(get_repository_advisories(installation_github, owner, repo_name))
-                for advisory in advisories:
-                    ghsa_id = advisory["ghsa_id"]
-                    ghsa_key = f"{owner}/{repo_name}/{ghsa_id}"
-                    active_advisories.add(ghsa_key)
-            except Exception:
-                logger.exception("Error fetching advisories for %s/%s", owner, repo_name)
-                continue
+        try:
+            advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+            for advisory in advisories:
+                ghsa_id = advisory["ghsa_id"]
+                ghsa_key = f"{owner}/{repo_name}/{ghsa_id}"
+                active_advisories.add(ghsa_key)
+        except Exception:
+            logger.exception("Error fetching advisories for %s/%s", owner, repo_name)
+            continue
 
     entries_to_remove = [ghsa_key for ghsa_key in state.ghsas if ghsa_key not in active_advisories]
     for ghsa_key in entries_to_remove:
@@ -201,57 +193,46 @@ def process_all_comments(
         CommentProcessingStats with run statistics
     """
     stats = CommentProcessingStats()
-    installations = github.rest.paginate(github.rest.apps.list_installations)
 
-    for installation_data in installations:
-        installation_name = installation_data.account.login
-        logger.info("Processing installation: %s", installation_name)
+    for installation_github, repo in iter_installation_repos(github):
+        owner = repo.owner.login
+        repo_name = repo.name
 
-        installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
-        repos = installation_github.rest.paginate(
-            installation_github.rest.apps.list_repos_accessible_to_installation,
-            map_func=lambda r: r.parsed_data.repositories,
-        )
+        try:
+            advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+            if not advisories:
+                continue
 
-        for repo in repos:
-            owner = repo.owner.login
-            repo_name = repo.name
+            count = len(advisories)
+            logger.debug("Found %d advisories in %s/%s", count, owner, repo_name)
 
-            try:
-                advisories = list(get_repository_advisories(installation_github, owner, repo_name))
-                if not advisories:
+            for advisory in advisories:
+                ghsa_id = advisory["ghsa_id"]
+                state_str = advisory["state"]
+
+                if state_str not in ("triage", "draft"):
+                    logger.debug("Skipping %s (state: %s)", ghsa_id, state_str)
                     continue
 
-                count = len(advisories)
-                logger.debug("Found %d advisories in %s/%s", count, owner, repo_name)
+                stats.ghsas_checked += 1
+                logger.info("Checking GHSA: %s/%s/%s (state: %s)", owner, repo_name, ghsa_id, state_str)
+                try:
+                    commands_executed = process_ghsa_comments(
+                        installation_github,
+                        playwright_client,
+                        state_manager,
+                        owner,
+                        repo_name,
+                        ghsa_id,
+                    )
+                    stats.commands_executed += commands_executed
+                except Exception:
+                    logger.exception("Error processing %s", ghsa_id)
+                    stats.errors += 1
 
-                for advisory in advisories:
-                    ghsa_id = advisory["ghsa_id"]
-                    state_str = advisory["state"]
-
-                    if state_str not in ("triage", "draft"):
-                        logger.debug("Skipping %s (state: %s)", ghsa_id, state_str)
-                        continue
-
-                    stats.ghsas_checked += 1
-                    logger.info("Checking GHSA: %s/%s/%s (state: %s)", owner, repo_name, ghsa_id, state_str)
-                    try:
-                        commands_executed = process_ghsa_comments(
-                            installation_github,
-                            playwright_client,
-                            state_manager,
-                            owner,
-                            repo_name,
-                            ghsa_id,
-                        )
-                        stats.commands_executed += commands_executed
-                    except Exception:
-                        logger.exception("Error processing %s", ghsa_id)
-                        stats.errors += 1
-
-            except Exception:
-                logger.exception("Error accessing repository %s/%s", owner, repo_name)
-                stats.errors += 1
+        except Exception:
+            logger.exception("Error accessing repository %s/%s", owner, repo_name)
+            stats.errors += 1
 
     return stats
 
@@ -259,24 +240,17 @@ def process_all_comments(
 def _collect_active_advisories(github: GitHub) -> list[dict]:
     """Collect all active advisories for reminder checking."""
     all_advisories = []
-    installations = github.rest.paginate(github.rest.apps.list_installations)
-    for installation_data in installations:
-        installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
-        repos = installation_github.rest.paginate(
-            installation_github.rest.apps.list_repos_accessible_to_installation,
-            map_func=lambda r: r.parsed_data.repositories,
-        )
-        for repo in repos:
-            owner = repo.owner.login
-            repo_name = repo.name
-            try:
-                advisories = list(get_repository_advisories(installation_github, owner, repo_name))
-                for advisory in advisories:
-                    if advisory["state"] in ("triage", "draft"):
-                        advisory["repository"] = {"full_name": f"{owner}/{repo_name}"}
-                        all_advisories.append(advisory)
-            except Exception:
-                logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
+    for installation_github, repo in iter_installation_repos(github):
+        owner = repo.owner.login
+        repo_name = repo.name
+        try:
+            advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+            for advisory in advisories:
+                if advisory["state"] in ("triage", "draft"):
+                    advisory["repository"] = {"full_name": f"{owner}/{repo_name}"}
+                    all_advisories.append(advisory)
+        except Exception:
+            logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
     return all_advisories
 
 
