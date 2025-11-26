@@ -11,7 +11,6 @@ BASE_DIR: Final[Path] = Path(__file__).parent.parent
 
 load_dotenv()
 
-T = TypeVar("T")
 type CheckinStatus = Literal["in_progress", "ok", "error"]
 
 
