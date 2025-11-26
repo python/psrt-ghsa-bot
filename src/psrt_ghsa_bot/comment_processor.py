@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 
+from psrt_ghsa_bot import config
 from psrt_ghsa_bot.app import get_repository_advisories
 from psrt_ghsa_bot.commands.executor import execute_command
 from psrt_ghsa_bot.commands.parser import parse_command
@@ -19,6 +20,23 @@ from psrt_ghsa_bot.state import StateManager
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_post_comment(
+    playwright_client: GitHubPlaywrightClient,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+    message: str,
+) -> None:
+    """Post a comment if DONT_COMMENT is not set, otherwise log what would be posted.
+
+    Fixes PLR0912 Too many branches
+    """
+    if config.DONT_COMMENT:
+        logger.info("[DONT_COMMENT] Would post: %s...", message[:100])
+    else:
+        post_ghsa_comment(playwright_client, owner, repo, ghsa_id, message)
 
 
 @dataclass
@@ -97,7 +115,7 @@ def process_ghsa_comments(
         logger.info("Executing command: %s from @%s on %s", cmd.action, author, ghsa_id)
         try:
             result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id)
-            post_ghsa_comment(playwright_client, owner, repo, ghsa_id, result.message)
+            _maybe_post_comment(playwright_client, owner, repo, ghsa_id, result.message)
             state_manager.mark_command_processed(ghsa_key, comment_id)
             commands_executed += 1
             logger.info("Command executed successfully: %s", cmd.action)
@@ -110,7 +128,7 @@ def process_ghsa_comments(
             )
 
             with contextlib.suppress(Exception):
-                post_ghsa_comment(playwright_client, owner, repo, ghsa_id, error_message)
+                _maybe_post_comment(playwright_client, owner, repo, ghsa_id, error_message)
 
     return commands_executed
 
@@ -190,6 +208,9 @@ def main() -> None:
     """Cmment processing machine."""
     logger.info("PSRT GHSA Bot - Comment Processor")
     logger.info("=" * 50)
+
+    if config.DONT_COMMENT:
+        logger.warning("DONT_COMMENT MODE ENABLED - Comments will NOT be posted")
 
     logger.info("Initializing GitHub API client...")
     gh_client_private_key = base64.b64decode(os.environ["GH_CLIENT_PRIVATE_KEY"]).decode().strip()

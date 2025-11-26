@@ -1,6 +1,9 @@
 """Common configuration for the PSRT GHSA Bot."""
 
+import os
 from typing import Final, Literal
+
+DONT_COMMENT: bool = os.getenv("DONT_COMMENT", "").lower() in ("true", "1", "yes")
 
 type CheckinStatus = Literal["in_progress", "ok", "error"]
 
