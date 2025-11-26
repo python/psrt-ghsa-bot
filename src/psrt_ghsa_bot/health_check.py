@@ -4,13 +4,19 @@ TODO: i'd like to know exactly the error and which workflow is failing
   and send it to sentry or slack or an email or whatever
 """
 
-import json
 import logging
-import subprocess
+import os
 import sys
+from typing import TYPE_CHECKING
+
+from githubkit.exception import RequestFailed
 
 from psrt_ghsa_bot._monitoring import capture_checkin, init_sentry, report_workflow_failure
 from psrt_ghsa_bot.settings import settings
+from psrt_ghsa_bot.utils.github import get_github_client
+
+if TYPE_CHECKING:
+    from githubkit import GitHub
 
 _mon = settings.monitoring
 
@@ -22,41 +28,50 @@ WORKFLOWS_TO_CHECK = [
 ]
 
 
+def _get_workflow_runs(github: GitHub, owner: str, repo: str, workflow_file: str) -> list[dict]:
+    """Fetch recent workflow runs for a specific workflow file."""
+    try:
+        response = github.rest.actions.list_workflow_runs(
+            owner=owner,
+            repo=repo,
+            workflow_id=workflow_file,
+            per_page=5,
+        )
+        return [
+            {"status": run.status, "conclusion": run.conclusion, "id": run.id}
+            for run in response.parsed_data.workflow_runs
+        ]
+    except RequestFailed as e:
+        logger.warning("Failed to get workflow runs: %s", e)
+        return []
+
+
 def check_workflow_health() -> None:
     """Check the health of configured workflows and report to Sentry."""
+    github_repository = os.environ.get("GITHUB_REPOSITORY")
+    if not github_repository:
+        msg = "GITHUB_REPOSITORY environment variable is required"
+        raise RuntimeError(msg)
+
+    owner, repo = github_repository.split("/")
+
     init_sentry()
     capture_checkin(_mon.MONITOR_SLUG_HEALTH, _mon.STATUS_IN_PROGRESS)
     workflow_statuses = {workflow["file"]: False for workflow in WORKFLOWS_TO_CHECK}
 
+    github = get_github_client()
+    installations = list(github.rest.paginate(github.rest.apps.list_installations))
+    if not installations:
+        logger.error("No GitHub App installations found")
+        capture_checkin(_mon.MONITOR_SLUG_HEALTH, _mon.STATUS_ERROR)
+        sys.exit(1)
+
+    installation_github = github.with_auth(github.auth.as_installation(installations[0].id))
+
     for workflow in WORKFLOWS_TO_CHECK:
         logger.info("Checking workflow: %s", workflow["file"])
 
-        result = subprocess.run(  # noqa: S603
-            [  # noqa: S607
-                "gh",
-                "run",
-                "list",
-                "--workflow",
-                workflow["file"],
-                "--json",
-                "conclusion,status,databaseId",
-                "--limit",
-                "5",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            logger.warning("Failed to get workflow runs: %s", result.stderr)
-            continue
-
-        try:
-            runs = json.loads(result.stdout)
-        except ValueError:
-            logger.warning("Failed to parse workflow runs for %s", workflow["file"])
-            continue
+        runs = _get_workflow_runs(installation_github, owner, repo, workflow["file"])
 
         if not runs:
             logger.warning("No runs found for %s", workflow["file"])
@@ -69,7 +84,7 @@ def check_workflow_health() -> None:
 
         latest_run = completed_runs[0]
         conclusion = latest_run["conclusion"]
-        run_id = latest_run["databaseId"]
+        run_id = latest_run["id"]
         logger.info("Latest run: %s - %s", run_id, conclusion)
 
         if conclusion in ["failure", "timed_out", "cancelled"]:

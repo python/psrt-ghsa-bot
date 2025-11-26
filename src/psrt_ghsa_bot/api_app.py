@@ -1,6 +1,5 @@
 """GitHub application which applies the PSRT process for GitHub Security Advisories."""
 
-import base64
 import datetime
 import json
 import typing
@@ -9,10 +8,13 @@ from http import HTTPStatus
 
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
-from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed
 
 from psrt_ghsa_bot.settings import settings
+from psrt_ghsa_bot.utils.github import get_github_client
+
+if typing.TYPE_CHECKING:
+    from githubkit import GitHub
 
 load_dotenv()
 
@@ -93,10 +95,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
 
 def main() -> None:
     """Main entry point for cron.yml."""
-    gh_client_private_key = base64.b64decode(settings.github.GH_CLIENT_PRIVATE_KEY).decode().strip()
-    github = GitHub(
-        AppAuthStrategy(settings.github.GH_CLIENT_ID, gh_client_private_key),
-    )
+    github = get_github_client()
     cve_api = CveApi(
         org="PSF",
         username=settings.cve.CVE_USERNAME,

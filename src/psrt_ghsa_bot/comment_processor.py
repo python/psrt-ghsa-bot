@@ -1,12 +1,11 @@
 """Comment processing service for PSRT GHSA Bot."""
 
-import base64
 import contextlib
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
-from githubkit import AppAuthStrategy, GitHub
 
 from psrt_ghsa_bot.api_app import get_repository_advisories
 from psrt_ghsa_bot.commands.executor import execute_command
@@ -16,6 +15,10 @@ from psrt_ghsa_bot.polyfills.playwright_base import GitHubPlaywrightClient
 from psrt_ghsa_bot.reminders import check_and_send_reminders
 from psrt_ghsa_bot.settings import settings
 from psrt_ghsa_bot.state import StateManager
+from psrt_ghsa_bot.utils.github import get_github_client
+
+if TYPE_CHECKING:
+    from githubkit import GitHub
 
 load_dotenv()
 
@@ -286,8 +289,7 @@ def main() -> None:
         logger.warning("DISABLE_COMMENTING MODE ENABLED - Comments will NOT be posted")
 
     logger.info("Initializing GitHub API client...")
-    gh_client_private_key = base64.b64decode(settings.github.GH_CLIENT_PRIVATE_KEY).decode().strip()
-    github = GitHub(AppAuthStrategy(settings.github.GH_CLIENT_ID, gh_client_private_key))
+    github = get_github_client()
 
     logger.info("Loading state manager...")
     state_manager = StateManager()
