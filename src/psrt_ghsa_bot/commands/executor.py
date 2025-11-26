@@ -135,12 +135,13 @@ def _handle_status(_cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id
         CommandResult with status information
     """
     try:
-        advisory = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
+        response = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
+        advisory = response.json()
 
-        state = advisory.parsed_data.state
-        cve_id = advisory.parsed_data.cve_id or "None assigned"
-        created_at = advisory.parsed_data.created_at
-        updated_at = advisory.parsed_data.updated_at
+        state = advisory["state"]
+        cve_id = advisory.get("cve_id") or "None assigned"
+        created_at = advisory["created_at"]
+        updated_at = advisory["updated_at"]
         created = datetime.fromisoformat(created_at)
         days_old = (datetime.now(created.tzinfo) - created).days
 
@@ -186,9 +187,10 @@ def _handle_reject(cmd: Command, github: GitHub, owner: str, repo: str, ghsa_id:
     cve_id = cmd.arguments[0]
 
     try:
-        advisory = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
+        response = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
+        advisory = response.json()
 
-        current_cve = advisory.parsed_data.cve_id
+        current_cve = advisory.get("cve_id")
 
         if current_cve is None:
             return CommandResult(
@@ -245,8 +247,9 @@ def _handle_assign_cve(cmd: Command, github: GitHub, owner: str, repo: str, ghsa
         CommandResult with assignment confirmation
     """
     try:
-        advisory = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
-        current_cve = advisory.parsed_data.cve_id
+        response = github.rest.security_advisories.get_repository_advisory(owner=owner, repo=repo, ghsa_id=ghsa_id)
+        advisory = response.json()
+        current_cve = advisory.get("cve_id")
 
         if current_cve is not None:
             return CommandResult(
