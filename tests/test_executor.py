@@ -69,12 +69,12 @@ class TestCommandExecution:
         mock_github.rest.teams.get_member_in_org.return_value = Mock(status_code=204)
 
         advisory_response = Mock()
-        advisory_response.parsed_data = Mock(
-            state="draft",
-            cve_id="CVE-2024-1234",
-            created_at="2024-01-01T00:00:00Z",
-            updated_at="2024-01-15T00:00:00Z",
-        )
+        advisory_response.json.return_value = {
+            "state": "draft",
+            "cve_id": "CVE-2024-1234",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-15T00:00:00Z",
+        }
         mock_github.rest.security_advisories.get_repository_advisory.return_value = advisory_response
 
         result = execute_command(
@@ -104,7 +104,7 @@ class TestCommandExecution:
         mock_github.rest.teams.get_member_in_org.return_value = Mock(status_code=204)
 
         advisory_response = Mock()
-        advisory_response.parsed_data = Mock(cve_id="CVE-2024-1234")
+        advisory_response.json.return_value = {"cve_id": "CVE-2024-1234"}
         mock_github.rest.security_advisories.get_repository_advisory.return_value = advisory_response
 
         result = execute_command(
@@ -157,7 +157,7 @@ class TestCommandExecution:
         mock_github.rest.teams.get_member_in_org.return_value = Mock(status_code=204)
 
         advisory_response = Mock()
-        advisory_response.parsed_data = Mock(cve_id=None)
+        advisory_response.json.return_value = {"cve_id": None}
         mock_github.rest.security_advisories.get_repository_advisory.return_value = advisory_response
 
         result = execute_command(

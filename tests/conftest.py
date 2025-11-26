@@ -69,7 +69,7 @@ def test_ghsa() -> Generator[dict[str, str]]:
         },
     )
 
-    ghsa_id = response.parsed_data.ghsa_id
+    ghsa_id = response.json()["ghsa_id"]
 
     yield {"owner": owner, "repo": repo, "ghsa_id": ghsa_id}
 
