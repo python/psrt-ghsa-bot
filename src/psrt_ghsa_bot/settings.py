@@ -3,7 +3,7 @@
 import os
 from dataclasses import MISSING, dataclass, fields
 from pathlib import Path
-from typing import Final, Literal, Self, TypeVar
+from typing import Final, Literal, Self
 
 from dotenv import load_dotenv
 
