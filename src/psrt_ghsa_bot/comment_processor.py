@@ -22,6 +22,20 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _maybe_post_comment(
+    playwright_client: GitHubPlaywrightClient,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+    message: str,
+) -> None:
+    """Post a comment unless DISABLE_COMMENTING is set."""
+    if settings.playwright.DISABLE_COMMENTING:
+        logger.info("[DISABLE_COMMENTING] Would post: %s...", message[:100])
+    else:
+        post_ghsa_comment(playwright_client, owner, repo, ghsa_id, message)
+
+
 @dataclass
 class CommentProcessingStats:
     """Statistics for a comment processing run."""
@@ -150,7 +164,7 @@ def process_ghsa_comments(
         logger.info("Executing command: %s from @%s on %s", cmd.action, author, ghsa_id)
         try:
             result = execute_command(cmd, github, playwright_client, owner, repo, ghsa_id)
-            post_ghsa_comment(playwright_client, owner, repo, ghsa_id, result.message)
+            _maybe_post_comment(playwright_client, owner, repo, ghsa_id, result.message)
             state_manager.mark_command_processed(ghsa_key, comment_id)
             commands_executed += 1
             logger.info("Command executed successfully: %s", cmd.action)
@@ -163,7 +177,7 @@ def process_ghsa_comments(
             )
 
             with contextlib.suppress(Exception):
-                post_ghsa_comment(playwright_client, owner, repo, ghsa_id, error_message)
+                _maybe_post_comment(playwright_client, owner, repo, ghsa_id, error_message)
 
     return commands_executed
 
@@ -243,6 +257,9 @@ def main() -> None:
     """Cmment processing machine."""
     logger.info("PSRT GHSA Bot - Comment Processor")
     logger.info("=" * 50)
+
+    if settings.playwright.DISABLE_COMMENTING:
+        logger.warning("DISABLE_COMMENTING MODE ENABLED - Comments will NOT be posted")
 
     logger.info("Initializing GitHub API client...")
     gh_client_private_key = base64.b64decode(settings.github.GH_CLIENT_PRIVATE_KEY).decode().strip()
