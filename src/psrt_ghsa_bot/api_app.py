@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from githubkit.exception import RequestFailed
 
 from psrt_ghsa_bot.settings import settings
-from psrt_ghsa_bot.utils.github import get_github_client
+from psrt_ghsa_bot.utils.github import get_github_client, iter_installation_repos
 
 if typing.TYPE_CHECKING:
     from githubkit import GitHub
@@ -104,19 +104,8 @@ def main() -> None:
     )
 
     # Apply to all repositories for each installation.
-    installations = github.rest.paginate(
-        github.rest.apps.list_installations,
-    )
-    for installation_data in installations:
-        installation_github = github.with_auth(
-            github.auth.as_installation(installation_data.id),
-        )
-        repos = installation_github.rest.paginate(
-            installation_github.rest.apps.list_repos_accessible_to_installation,
-            map_func=lambda r: r.parsed_data.repositories,
-        )
-        for repo in repos:
-            apply_to_repo(installation_github, repo.owner.login, repo.name, cve_api)
+    for installation_github, repo in iter_installation_repos(github):
+        apply_to_repo(installation_github, repo.owner.login, repo.name, cve_api)
 
 
 if __name__ == "__main__":
