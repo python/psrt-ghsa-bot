@@ -118,23 +118,22 @@ def _is_ghsa_collaborator(
         True if user is a collaborator on the advisory
     """
     try:
-        advisory = github.rest.security_advisories.get_repository_advisory(
+        response = github.rest.security_advisories.get_repository_advisory(
             owner=owner,
             repo=repo,
             ghsa_id=ghsa_id,
         )
+        advisory = response.json()
 
-        if not advisory.parsed_data:
-            return False
-
-        collaborators = advisory.parsed_data.collaborating_users or []
-        teams = advisory.parsed_data.collaborating_teams or []
+        collaborators = advisory.get("collaborating_users") or []
+        teams = advisory.get("collaborating_teams") or []
 
         for collaborator in collaborators:
-            if collaborator.login and collaborator.login.lower() == username.lower():
+            login = collaborator.get("login")
+            if login and login.lower() == username.lower():
                 return True
 
-        return any(team.slug and _is_team_member(github, owner, team.slug, username) for team in teams)
+        return any((slug := team.get("slug")) and _is_team_member(github, owner, slug, username) for team in teams)
     except Exception:
         return False
 
@@ -191,10 +190,11 @@ def _is_repo_admin(
             repo=repo,
             username=username,
         )
-
-        if not response.parsed_data or not response.parsed_data.permission:
+        data = response.json()
+        permission = data.get("permission")
+        if not permission:
             return False
     except Exception:
         return False
     else:
-        return response.parsed_data.permission == "admin"
+        return permission == "admin"

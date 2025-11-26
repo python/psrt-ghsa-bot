@@ -2,6 +2,9 @@
  to find all mentions from their notification and act on that instead of scraping?
  that would mean we wouldnt have to keep state tracking and processing things
  "AFTER or ON" whenever the gh action ran las based on state
+- If Playwright action runs before cron action, should we have playwright kick it off
+  so that the right groups are assigned?
+
 - When someone duplicate a coammand we shouldnt run it twice:
  ```
  2025-11-19 21:56:42,654 - __main__ - INFO - Command executed successfully: help
