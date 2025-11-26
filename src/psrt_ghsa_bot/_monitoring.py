@@ -9,7 +9,7 @@ from sentry_sdk import crons
 from psrt_ghsa_bot.settings import settings
 
 if TYPE_CHECKING:
-    from psrt_ghsa_bot.config import CheckinStatus
+    from psrt_ghsa_bot.settings import CheckinStatus
 
 
 def init_sentry() -> None:

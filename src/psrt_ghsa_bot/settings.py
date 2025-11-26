@@ -12,6 +12,7 @@ BASE_DIR: Final[Path] = Path(__file__).parent.parent
 load_dotenv()
 
 T = TypeVar("T")
+type CheckinStatus = Literal["in_progress", "ok", "error"]
 
 
 def _load_from_env[T](cls: type[T]) -> T:
@@ -122,6 +123,18 @@ class MonitoringSettings:
 
     SENTRY_DSN: str | None = None
     """Sentry DSN for error tracking."""
+
+    STATUS_IN_PROGRESS: Final[CheckinStatus] = "in_progress"
+    STATUS_OK: Final[CheckinStatus] = "ok"
+    STATUS_ERROR: Final[CheckinStatus] = "error"
+    """Status checks for monitoring."""
+
+    MONITOR_SLUG_HEALTH: Final[str] = "psrt-health-monitor"
+    """Monitor slug for overall health check of all GHA workflows."""
+    MONITOR_SLUG_GHSA: Final[str] = "psrt-ghsa-cron"
+    """Monitor slug for GHSA processing workflow via GitHub App."""
+    MONITOR_SLUG_PLAYWRIGHT: Final[str] = "psrt-playwright-cron"
+    """Monitor slug for Playwright workflow via GitHub App."""
 
     @classmethod
     def from_env(cls) -> Self:
