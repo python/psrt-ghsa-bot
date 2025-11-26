@@ -17,7 +17,7 @@ Bot which adds the PSRT GitHub team (`python/psrt`) and CVE IDs to GitHub Securi
   - Parses `@<bot-username>` commands, executes if authorized
   - Posts responses, tracks state in `state.json`
 - Health checks are done via [`.github/workflows/health-check.yml`](.github/workflows/health-check.yml) and runs every 15 minutes.
-  - It checks the status using the `gh` CLI and reports to Sentry if the bot is not healthy via Sentry cron monitors.
+  - It checks workflow run status via the GitHub API and reports to Sentry cron monitors if unhealthy.
 
 ### Why Playwright?
 
@@ -43,6 +43,25 @@ The Playwright bot uses the GitHub App installation to generate a list of repos
 (~[comment_processor.py:130-140](src/psrt_ghsa_bot/comment_processor.py#L130-L140)), so any permission
 mismatch will cause failures
 
+### GitHub App Permissions
+
+The GitHub App requires the following permissions:
+
+| Permission        | Access       | Purpose                                               |
+|-------------------|--------------|-------------------------------------------------------|
+| `security_events` | Read & Write | Access and update security advisories, assign CVE IDs |
+| `actions`         | Read         | Health check monitoring of workflow runs              |
+| `members`         | Read         | Verify team membership for command authorization      |
+| `metadata`        | Read         | Required for basic repository access                  |
+
+### Playwright Bot User Requirements
+
+The bot user (`GH_BOT_USERNAME`) requires:
+
+- **Organization membership** in all orgs where the GitHub App is installed
+- **Repository access** matching the GitHub App installation scope
+- **2FA enabled** with TOTP (the bot uses `GH_BOT_OTP_SECRET` for authentication)
+- **Write access** to security advisories (to post comments via browser automation)
 
 ## Development
 
