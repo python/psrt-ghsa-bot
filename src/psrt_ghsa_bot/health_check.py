@@ -7,16 +7,10 @@ TODO: i'd like to know exactly the error and which workflow is failing
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
-
-from githubkit.exception import RequestFailed
 
 from psrt_ghsa_bot._monitoring import capture_checkin, init_sentry, report_workflow_failure
 from psrt_ghsa_bot.settings import settings
-from psrt_ghsa_bot.utils.github import get_github_client
-
-if TYPE_CHECKING:
-    from githubkit import GitHub
+from psrt_ghsa_bot.utils.github import get_github_client, get_workflow_runs
 
 _mon = settings.monitoring
 
@@ -26,24 +20,6 @@ WORKFLOWS_TO_CHECK = [
     {"file": "cron.yml", "monitor_slug": _mon.MONITOR_SLUG_GHSA},
     {"file": "playwright.yml", "monitor_slug": _mon.MONITOR_SLUG_PLAYWRIGHT},
 ]
-
-
-def _get_workflow_runs(github: GitHub, owner: str, repo: str, workflow_file: str) -> list[dict]:
-    """Fetch recent workflow runs for a specific workflow file."""
-    try:
-        response = github.rest.actions.list_workflow_runs(
-            owner=owner,
-            repo=repo,
-            workflow_id=workflow_file,
-            per_page=5,
-        )
-        return [
-            {"status": run.status, "conclusion": run.conclusion, "id": run.id}
-            for run in response.parsed_data.workflow_runs
-        ]
-    except RequestFailed as e:
-        logger.warning("Failed to get workflow runs: %s", e)
-        return []
 
 
 def check_workflow_health() -> None:
@@ -70,8 +46,7 @@ def check_workflow_health() -> None:
 
     for workflow in WORKFLOWS_TO_CHECK:
         logger.info("Checking workflow: %s", workflow["file"])
-
-        runs = _get_workflow_runs(installation_github, owner, repo, workflow["file"])
+        runs = get_workflow_runs(installation_github, owner, repo, workflow["file"])
 
         if not runs:
             logger.warning("No runs found for %s", workflow["file"])
