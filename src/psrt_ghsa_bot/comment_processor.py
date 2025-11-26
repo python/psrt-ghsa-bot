@@ -253,6 +253,30 @@ def process_all_comments(
     return stats
 
 
+def _collect_active_advisories(github: GitHub) -> list[dict]:
+    """Collect all active advisories for reminder checking."""
+    all_advisories = []
+    installations = github.rest.paginate(github.rest.apps.list_installations)
+    for installation_data in installations:
+        installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
+        repos = installation_github.rest.paginate(
+            installation_github.rest.apps.list_repos_accessible_to_installation,
+            map_func=lambda r: r.parsed_data.repositories,
+        )
+        for repo in repos:
+            owner = repo.owner.login
+            repo_name = repo.name
+            try:
+                advisories = list(get_repository_advisories(installation_github, owner, repo_name))
+                for advisory in advisories:
+                    if advisory["state"] in ("triage", "draft"):
+                        advisory["repository"] = {"full_name": f"{owner}/{repo_name}"}
+                        all_advisories.append(advisory)
+            except Exception:
+                logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
+    return all_advisories
+
+
 def main() -> None:
     """Cmment processing machine."""
     logger.info("PSRT GHSA Bot - Comment Processor")
@@ -284,25 +308,7 @@ def main() -> None:
         stats.state_entries_cleaned = cleaned
 
         logger.info("Collecting all active advisories for reminder check...")
-        all_advisories = []
-        installations = github.rest.paginate(github.rest.apps.list_installations)
-        for installation_data in installations:
-            installation_github = github.with_auth(github.auth.as_installation(installation_data.id))
-            repos = installation_github.rest.paginate(
-                installation_github.rest.apps.list_repos_accessible_to_installation,
-                map_func=lambda r: r.parsed_data.repositories,
-            )
-            for repo in repos:
-                owner = repo.owner.login
-                repo_name = repo.name
-                try:
-                    advisories = list(get_repository_advisories(installation_github, owner, repo_name))
-                    for advisory in advisories:
-                        if advisory["state"] in ("triage", "draft"):
-                            advisory["repository"] = {"full_name": f"{owner}/{repo_name}"}
-                            all_advisories.append(advisory)
-                except Exception:
-                    logger.exception("Error fetching advisories for reminders: %s/%s", owner, repo_name)
+        all_advisories = _collect_active_advisories(github)
 
         logger.info("Checking for deadline reminders...")
         reminders_sent = check_and_send_reminders(github, playwright_client, all_advisories, state_manager)
