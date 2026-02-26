@@ -41,6 +41,7 @@ def _create_advisory_dict(state, cve_id, collaborating_teams):
         "state": state,
         "cve_id": cve_id,
         "collaborating_teams": [{"slug": team} for team in collaborating_teams],
+        "collaborating_users": [{"login": "octocat", "id": 1, "type": "User"}],
     }
 
 
@@ -151,6 +152,48 @@ def test_does_not_reserve_cve_id_for_triage_security_advisories(state) -> None:
         )
     else:
         github.rest.security_advisories.update_repository_advisory.assert_not_called()
+
+
+def test_update_collaborating_users() -> None:
+    security_advisory = _create_advisory_dict("draft", None, ["psrt"])
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+    ):
+        security_advisory = _create_advisory_dict("draft", "CVE-2026-0001", ["psrt"])
+        get_repo_advs.return_value = [security_advisory]
+
+        # 'alice' isn't in the GitHub Team, but is in the Devguide list.
+        app.apply_to_repo(github, "owner", "repo", cve_api, collaborating_users={"alice"})
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"collaborating_teams": ["psrt"], "collaborating_users": ["alice", "octocat"]},
+    )
+
+
+def test_load_psrt_members_from_devguide() -> None:
+    with mock.patch("psrt_ghsa_bot.app.urllib3.request") as urllib3_request:
+        resp = mock.Mock()
+        resp.status = 200
+        resp.data = b"""Barry Warsaw,warsaw,Admin
+Benjamin Peterson,benjaminp,
+Donald Stufft,dstufft,
+Dustin Ingram,di,
+Ee Durbin,ewdurbin,Admin
+Glyph Lefkowitz,glyph,
+Gregory P. Smith,gpshead,"""
+
+        urllib3_request.return_value = resp
+
+        members = app.load_psrt_members_from_devguide()
+
+    assert members == {"warsaw", "benjaminp", "dstufft", "di", "ewdurbin", "glyph", "gpshead"}
 
 
 def test_reserve_one_cve_id(cve_reserve_response, cve_id, year) -> None:

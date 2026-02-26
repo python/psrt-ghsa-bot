@@ -1,10 +1,12 @@
 """GitHub application which applies the PSRT process for GitHub Security Advisories."""
 
 import base64
+import csv
 import datetime
 import os
 import typing
 
+import urllib3
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
@@ -14,7 +16,36 @@ load_dotenv()
 if typing.TYPE_CHECKING:
     pass
 
+PSRT_GITHUB_TEAM_ORG = "python"
 PSRT_GITHUB_TEAM_SLUG = "psrt"
+
+
+def load_psrt_members_from_devguide() -> set[str]:
+    """The PSRT GitHub team only supports adding users that are
+    already within the 'python' GitHub org. This allows users
+    that aren't in the org team to be added automatically to
+    GHSA advisories.
+    """
+    psrt_csv_url = "https://raw.githubusercontent.com/python/devguide/refs/heads/main/developer-workflow/psrt.csv"
+    resp = urllib3.request(
+        "GET", psrt_csv_url, timeout=10, redirect=False, retries=urllib3.Retry(total=5, backoff_factor=2)
+    )
+    if resp.status != 200:
+        raise RuntimeError(
+            f"Couldn't resolve PSRT members from python/devguide (status={resp.status} data={resp.data[:500]})"
+        )
+    rows = csv.reader(resp.data.decode().splitlines())
+    return {github_login.lower() for _, github_login, *_ in rows}
+
+
+def load_psrt_members_from_github(github: GitHub) -> set[str]:
+    """Loads the GitHub usernames from the PSRT team on GitHub"""
+    team_members = github.rest.teams.list_members_in_org(
+        org=PSRT_GITHUB_TEAM_ORG,
+        team_slug=PSRT_GITHUB_TEAM_SLUG,
+        per_page=100,
+    )
+    return {member.login.lower() for member in team_members.parsed_data}
 
 
 def get_repository_advisories(
@@ -51,7 +82,9 @@ def reserve_one_cve(cve_api: CveApi) -> str:
     return cve_ids[0]
 
 
-def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> None:
+def apply_to_repo(
+    github: GitHub, owner: str, repo: str, cve_api: CveApi, *, collaborating_users: set[str] | None = None
+) -> None:
     """Applies the PSRT GitHub Security Advisory process to the repository."""
     security_advisories = get_repository_advisories(github, owner, repo)
     advisory_count = 0
@@ -76,6 +109,18 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
             cve_id = reserve_one_cve(cve_api)
             patch_data["cve_id"] = cve_id
             print(f"       ✅ Will reserve CVE ID: {cve_id}")
+
+        if collaborating_users:
+            # Determine if we set the 'collaborating_users' field
+            # at all by seeing if there are missing users on the
+            # advisory. Preserve the old list, as this is edited
+            # manually by coordinators.
+            prev_collaborating_users = {user["login"].lower() for user in security_advisory["collaborating_users"]}
+            if collaborating_users - prev_collaborating_users:
+                # Sorting is only done for consistency's sake in testing.
+                new_collaborating_users = sorted(collaborating_users | prev_collaborating_users)
+                patch_data["collaborating_users"] = new_collaborating_users
+                print(f"       ➕ Will ensure users are present: {new_collaborating_users}")
 
         patch_data["collaborating_teams"] = [PSRT_GITHUB_TEAM_SLUG]
         print(f"       ➕ Will ensure team present: {PSRT_GITHUB_TEAM_SLUG}")
@@ -109,6 +154,18 @@ def main() -> None:
         env=os.environ.get("CVE_ENV", "prod"),
     )
 
+    print("Fetching PSRT members from Developer Guide...")
+    psrt_members_devguide = load_psrt_members_from_devguide()
+
+    print("Fetching PSRT members from GitHub Team...")
+    psrt_members_github = load_psrt_members_from_github(github)
+
+    # Determine which PSRT members need to be added as
+    # 'collaborating_users' to advisories due to not being
+    # in the GitHub Team and Organization.
+    collaborating_users = set(psrt_members_devguide - psrt_members_github)
+    print(f"PSRT members not in GitHub Team: {', '.join(sorted(collaborating_users))}")
+
     print("Fetching installations...")
     # Apply to all repositories for each installation.
     installations = github.rest.paginate(
@@ -128,7 +185,9 @@ def main() -> None:
         )
         for repo in repos:
             print(f"  Checking repo: {repo.owner.login}/{repo.name}")
-            apply_to_repo(installation_github, repo.owner.login, repo.name, cve_api)
+            apply_to_repo(
+                installation_github, repo.owner.login, repo.name, cve_api, collaborating_users=collaborating_users
+            )
 
     print(f"\nDone! Processed {installation_count} installation(s).")
 
