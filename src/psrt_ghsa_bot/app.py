@@ -77,8 +77,11 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
             patch_data["cve_id"] = cve_id
             print(f"       ✅ Will reserve CVE ID: {cve_id}")
 
-        patch_data["collaborating_teams"] = [PSRT_GITHUB_TEAM_SLUG]
-        print(f"       ➕ Will ensure team present: {PSRT_GITHUB_TEAM_SLUG}")
+        collaborating_teams = {team["slug"] for team in security_advisory["collaborating_teams"]}
+        if PSRT_GITHUB_TEAM_SLUG not in collaborating_teams:
+            collaborating_teams.add(PSRT_GITHUB_TEAM_SLUG)
+            patch_data["collaborating_teams"] = sorted(collaborating_teams)
+            print(f"       ➕ Will ensure team present: {PSRT_GITHUB_TEAM_SLUG}")
 
         # Apply updates, if any, to the security advisory.
         if patch_data:
