@@ -173,7 +173,7 @@ def test_update_collaborating_users() -> None:
         owner="owner",
         repo="repo",
         ghsa_id="GHSA-xxxx-xxxx-xxxx",
-        data={"collaborating_teams": ["psrt"], "collaborating_users": ["alice", "octocat"]},
+        data={"collaborating_users": ["alice", "octocat"]},
     )
 
 
