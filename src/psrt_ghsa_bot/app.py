@@ -157,17 +157,26 @@ def main() -> None:
         env=os.environ.get("CVE_ENV", "prod"),
     )
 
-    print("Fetching PSRT members from Developer Guide...")
-    psrt_members_devguide = load_psrt_members_from_devguide()
+    psrt_members_devguide: set[str] | None = None
+    psrt_members_github: set[str] | None = None
 
-    print("Fetching PSRT members from GitHub Team...")
-    psrt_members_github = load_psrt_members_from_github(github)
+    def fetch_collaborating_users(installation_github: GitHub) -> set[str]:
+        nonlocal psrt_members_github, psrt_members_devguide
 
-    # Determine which PSRT members need to be added as
-    # 'collaborating_users' to advisories due to not being
-    # in the GitHub Team and Organization.
-    collaborating_users = set(psrt_members_devguide - psrt_members_github)
-    print(f"PSRT members not in GitHub Team: {', '.join(sorted(collaborating_users))}")
+        # Only run the fetching step once.
+        if psrt_members_github is None or psrt_members_devguide is None:
+            print("Fetching PSRT members from Developer Guide...")
+            psrt_members_devguide = load_psrt_members_from_devguide()
+
+            print("Fetching PSRT members from GitHub Team...")
+            psrt_members_github = load_psrt_members_from_github(installation_github)
+
+        # Determine which PSRT members need to be added as
+        # 'collaborating_users' to advisories due to not being
+        # in the GitHub Team and Organization.
+        psrt_members_not_in_github = set(psrt_members_devguide - psrt_members_github)
+        print(f"PSRT members not in GitHub Team: {', '.join(sorted(psrt_members_not_in_github))}")
+        return psrt_members_not_in_github
 
     print("Fetching installations...")
     # Apply to all repositories for each installation.
@@ -182,6 +191,8 @@ def main() -> None:
         installation_github = github.with_auth(
             github.auth.as_installation(installation_data.id),
         )
+
+        collaborating_users = fetch_collaborating_users(installation_github)
         repos = installation_github.rest.paginate(
             installation_github.rest.apps.list_repos_accessible_to_installation,
             map_func=lambda r: r.parsed_data.repositories,
