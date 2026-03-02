@@ -10,6 +10,7 @@ import urllib3
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
+from githubkit.exception import RequestFailed
 
 load_dotenv()
 
@@ -130,12 +131,16 @@ def apply_to_repo(
 
         # Apply updates, if any, to the security advisory.
         if patch_data:
-            github.rest.security_advisories.update_repository_advisory(
-                owner=owner,
-                repo=repo,
-                ghsa_id=ghsa_id,
-                data=patch_data,
-            )
+            try:
+                github.rest.security_advisories.update_repository_advisory(
+                    owner=owner,
+                    repo=repo,
+                    ghsa_id=ghsa_id,
+                    data=patch_data,
+                )
+            except RequestFailed as e:
+                print(f"       ⚠️ Error updating advisory: {e.response.json()}")
+                raise e
             print("       💾 Updated advisory")
         else:
             print("       ⏭️  No updates needed")
