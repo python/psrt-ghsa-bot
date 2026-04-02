@@ -178,12 +178,15 @@ def test_update_collaborating_users() -> None:
     )
 
 
-@pytest.mark.parametrize("summary", [
-    "[CLOSE] perl is better than Python",
-    "[CLOSED] 0.1 + 0.2 is broken?!?!?!?!?!",
-    "[COMPLETE] some boring security thing",
-    "fix soemthing in datetime module [COMPLETED]",
-    "blah blah [closed] lowercase blah"]
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "[CLOSE] perl is better than Python",
+        "[CLOSED] 0.1 + 0.2 is broken?!?!?!?!?!",
+        "[COMPLETE] some boring security thing",
+        "fix soemthing in datetime module [COMPLETED]",
+        "blah blah [closed] lowercase blah",
+    ],
 )
 def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
     security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
@@ -204,10 +207,13 @@ def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
     )
 
 
-@pytest.mark.parametrize("summary", [
-    "[ACCEPT] critical vulnerability in str.lowercase()",
-    "spam foo bar [ACCEPTED]",
-    "i'm bored of these [draft]",]
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "[ACCEPT] critical vulnerability in str.lowercase()",
+        "spam foo bar [ACCEPTED]",
+        "i'm bored of these [draft]",
+    ],
 )
 def test_drafts_triage_advisory_with_accept_or_draft_tag(summary, cve_id, cve_reserve_response) -> None:
     security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
