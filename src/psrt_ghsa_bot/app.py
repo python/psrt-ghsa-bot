@@ -101,6 +101,18 @@ def apply_to_repo(
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
 
+        # If the summary starts with "[CLOSED]", close the advisory.
+        summary = security_advisory.get("summary", "")
+        if summary.upper().startswith("[CLOSED]"):
+            github.rest.security_advisories.update_repository_advisory(
+                owner=owner,
+                repo=repo,
+                ghsa_id=ghsa_id,
+                data={"state": "closed"},
+            )
+            print(f"    📋 Closed {ghsa_id}")
+            continue
+
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
 
