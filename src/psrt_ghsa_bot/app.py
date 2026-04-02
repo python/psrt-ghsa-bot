@@ -4,6 +4,7 @@ import base64
 import csv
 import datetime
 import os
+import re
 import typing
 
 import urllib3
@@ -101,10 +102,10 @@ def apply_to_repo(
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
 
-        # If the summary contains '[CLOSE]' or [CLOSED]' then
-        # we can close the ticket.
+        # If the summary contains '[CLOSE]', '[CLOSED]', '[COMPLETE]',
+        # or '[COMPLETED]' then we can close the ticket.
         summary = security_advisory.get("summary", "")
-        if re.search(r"\[CLOSED?\]", summary.upper()) is not None:
+        if re.search(r"\[(?:CLOSED?|COMPLETED?)\]", summary.upper()) is not None:
             github.rest.security_advisories.update_repository_advisory(
                 owner=owner,
                 repo=repo,
@@ -117,9 +118,14 @@ def apply_to_repo(
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
 
+        # If the summary contains '[ACCEPT]' or '[DRAFT]', transition it to the draft state.
+        if state == "triage" and re.search(r"\[(?:ACCEPT(?:ED)?|DRAFT)\]", summary.upper()) is not None:
+            patch_data["state"] = "draft"
+            print(f"    📋 Moving {ghsa_id} to drafts")
+
         # Advisories that are in the 'draft' state without a CVE ID
         # should have one allocated by the PSF CVE Numbering Authority.
-        if state == "draft" and security_advisory.get("cve_id") is None:
+        if (state == "draft" or patch_data.get("state") == "draft") and security_advisory.get("cve_id") is None:
             cve_id = reserve_one_cve(cve_api)
             patch_data["cve_id"] = cve_id
             print(f"       ✅ Will reserve CVE ID: {cve_id}")

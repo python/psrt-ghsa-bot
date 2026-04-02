@@ -34,11 +34,12 @@ def cve_reserve_response(cve_id, year):
     }
 
 
-def _create_advisory_dict(state, cve_id, collaborating_teams):
+def _create_advisory_dict(state, cve_id, collaborating_teams, summary=""):
     """Helper to create a security advisory dictionary."""
     return {
         "ghsa_id": "GHSA-xxxx-xxxx-xxxx",
         "state": state,
+        "summary": summary,
         "cve_id": cve_id,
         "collaborating_teams": [{"slug": team} for team in collaborating_teams],
         "collaborating_users": [{"login": "octocat", "id": 1, "type": "User"}],
@@ -174,6 +175,57 @@ def test_update_collaborating_users() -> None:
         repo="repo",
         ghsa_id="GHSA-xxxx-xxxx-xxxx",
         data={"collaborating_users": ["alice", "octocat"]},
+    )
+
+
+@pytest.mark.parametrize("summary", [
+    "[CLOSE] perl is better than Python",
+    "[CLOSED] 0.1 + 0.2 is broken?!?!?!?!?!",
+    "[COMPLETE] some boring security thing",
+    "fix soemthing in datetime module [COMPLETED]",
+    "blah blah [closed] lowercase blah"]
+)
+def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
+    security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"state": "closed"},
+    )
+
+
+@pytest.mark.parametrize("summary", [
+    "[ACCEPT] critical vulnerability in str.lowercase()",
+    "spam foo bar [ACCEPTED]",
+    "i'm bored of these [draft]",]
+)
+def test_drafts_triage_advisory_with_accept_or_draft_tag(summary, cve_id, cve_reserve_response) -> None:
+    security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+    cve_api.reserve.return_value = cve_reserve_response
+
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"state": "draft", "cve_id": cve_id, "collaborating_teams": ["psrt"]},
     )
 
 
