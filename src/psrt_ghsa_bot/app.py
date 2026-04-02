@@ -101,9 +101,10 @@ def apply_to_repo(
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
 
-        # If the summary starts with "[CLOSED]", close the advisory.
+        # If the summary contains '[CLOSE]' or [CLOSED]' then
+        # we can close the ticket.
         summary = security_advisory.get("summary", "")
-        if summary.upper().startswith("[CLOSED]"):
+        if re.search(r"\[CLOSED?\]", summary.upper()) is not None:
             github.rest.security_advisories.update_repository_advisory(
                 owner=owner,
                 repo=repo,
