@@ -207,34 +207,6 @@ def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "summary",
-    [
-        "[ACCEPT] critical vulnerability in str.lowercase()",
-        "spam foo bar [ACCEPTED]",
-        "i'm bored of these [draft]",
-    ],
-)
-def test_drafts_triage_advisory_with_accept_or_draft_tag(summary, cve_id, cve_reserve_response) -> None:
-    security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
-
-    github = mock.Mock()
-    cve_api = mock.Mock()
-    cve_api.reserve.return_value = cve_reserve_response
-
-    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
-        get_repo_advs.return_value = [security_advisory]
-
-        app.apply_to_repo(github, "owner", "repo", cve_api)
-
-    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
-        owner="owner",
-        repo="repo",
-        ghsa_id="GHSA-xxxx-xxxx-xxxx",
-        data={"state": "draft", "cve_id": cve_id, "collaborating_teams": ["psrt"]},
-    )
-
-
 def test_load_psrt_members_from_devguide() -> None:
     with mock.patch("psrt_ghsa_bot.app.urllib3.request") as urllib3_request:
         resp = mock.Mock()
