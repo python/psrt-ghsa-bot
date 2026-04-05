@@ -112,7 +112,7 @@ def apply_to_repo(
                 ghsa_id=ghsa_id,
                 data={"state": "closed"},
             )
-            print(f"    📋 Closed {ghsa_id}")
+            print(f"       🧹 Closed {ghsa_id}")
             continue
 
         # Maintain a dictionary of updates to make and then submit them all at once.
