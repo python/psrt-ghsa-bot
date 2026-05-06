@@ -43,6 +43,7 @@ def _create_advisory_dict(state, cve_id, collaborating_teams, summary=""):
         "cve_id": cve_id,
         "collaborating_teams": [{"slug": team} for team in collaborating_teams],
         "collaborating_users": [{"login": "octocat", "id": 1, "type": "User"}],
+        "private_fork": {"name": "repo-ghsa-xxxx-xxxx-xxxx", "owner": {"login": "owner"}},
     }
 
 
@@ -156,8 +157,6 @@ def test_does_not_reserve_cve_id_for_triage_security_advisories(state) -> None:
 
 
 def test_update_collaborating_users() -> None:
-    security_advisory = _create_advisory_dict("draft", None, ["psrt"])
-
     github = mock.Mock()
     cve_api = mock.Mock()
 
@@ -175,6 +174,26 @@ def test_update_collaborating_users() -> None:
         repo="repo",
         ghsa_id="GHSA-xxxx-xxxx-xxxx",
         data={"collaborating_users": ["alice", "octocat"]},
+    )
+
+
+def test_create_private_fork() -> None:
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+    ):
+        security_advisory = _create_advisory_dict("draft", "CVE-2026-0001", ["psrt"])
+        security_advisory.pop("private_fork", None)
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    github.rest.security_advisories.create_fork.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
     )
 
 
