@@ -161,20 +161,6 @@ def apply_to_repo(
             print(f"       🧹 Closed {ghsa_id}")
             continue
 
-        # Advisories that are in the 'draft' state without a private
-        # fork active will have a fork requested.
-        if state == "draft" and security_advisory.get("private_fork") is None:
-            print("       🔨 No private fork, creating a private fork")
-            try:
-                github.rest.security_advisories.create_fork(
-                    owner=owner,
-                    repo=repo,
-                    ghsa_id=ghsa_id,
-                )
-            except RequestFailed as e:
-                print(f"       ⚠️ Error creating private fork: {e.response.json()}")
-                raise e
-
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
 
