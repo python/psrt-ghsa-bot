@@ -164,7 +164,7 @@ def apply_to_repo(
         # Advisories that are in the 'draft' state without a private
         # fork active will have a fork requested.
         if state == "draft" and security_advisory.get("private_fork") is None:
-            print(f"       + No private fork, creating a private fork")
+            print("       + No private fork, creating a private fork")
             try:
                 github.rest.security_advisories.create_fork(
                     owner=owner,
