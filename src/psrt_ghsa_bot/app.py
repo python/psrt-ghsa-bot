@@ -22,6 +22,16 @@ if typing.TYPE_CHECKING:
 
 PSRT_GITHUB_TEAM_ORG = "python"
 PSRT_GITHUB_TEAM_SLUG = "psrt"
+COMPLETION_TAGS = (
+    "CLOSE",
+    "CLOSED",
+    "COMPLETE",
+    "COMPLETED",
+    "NOTPLANNED",
+    "INVALID",
+    "DUPLICATE",
+    "FIXED",
+)
 
 
 def load_psrt_members_from_devguide() -> set[str]:
@@ -148,10 +158,9 @@ def apply_to_repo(
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
 
-        # If the summary contains '[CLOSE]', '[CLOSED]', '[COMPLETE]',
-        # or '[COMPLETED]' then we can close the ticket.
+        # If the summary contains a completion tag then we can close the ticket.
         summary = security_advisory.get("summary", "")
-        if re.search(r"\[(?:CLOSED?|COMPLETED?)\]", summary.upper()) is not None:
+        if re.search(rf"\[(?:{"|".join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
             github.rest.security_advisories.update_repository_advisory(
                 owner=owner,
                 repo=repo,

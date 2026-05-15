@@ -205,9 +205,13 @@ def test_create_private_fork() -> None:
         "[COMPLETE] some boring security thing",
         "fix soemthing in datetime module [COMPLETED]",
         "blah blah [closed] lowercase blah",
+        "[NOTPLANNED] no fix planned",
+        "[INVALID] some annoying spam",
+        "[DUPLICATE] we've seen this one before",
+        "[FIXED] already fixed",
     ],
 )
-def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
+def test_closes_advisory_with_completion_tag(summary) -> None:
     security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
 
     github = mock.Mock()
