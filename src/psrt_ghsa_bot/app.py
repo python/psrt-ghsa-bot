@@ -30,23 +30,16 @@ def load_psrt_members_from_devguide() -> set[str]:
     that aren't in the org team to be added automatically to
     GHSA advisories.
     """
-    # The CSV is being moved from developer-workflow/ to security/ in the devguide.
-    # Try both locations during the transition; drop the old one once the move is done.
-    psrt_csv_urls = (
-        "https://raw.githubusercontent.com/python/devguide/refs/heads/main/security/psrt.csv",
-        "https://raw.githubusercontent.com/python/devguide/refs/heads/main/developer-workflow/psrt.csv",
+    psrt_csv_url = "https://raw.githubusercontent.com/python/devguide/refs/heads/main/security/psrt.csv"
+    resp = urllib3.request(
+        "GET", psrt_csv_url, timeout=10, redirect=False, retries=urllib3.Retry(total=5, backoff_factor=2)
     )
-    for psrt_csv_url in psrt_csv_urls:
-        resp = urllib3.request(
-            "GET", psrt_csv_url, timeout=10, redirect=False, retries=urllib3.Retry(total=5, backoff_factor=2)
+    if resp.status != 200:
+        raise RuntimeError(
+            f"Couldn't resolve PSRT members from python/devguide (status={resp.status} data={resp.data[:500]})"
         )
-        if resp.status == 200:
-            rows = csv.reader(resp.data.decode().splitlines())
-            return {github_login.lower() for _, github_login, *_ in rows}
-
-    raise RuntimeError(
-        f"Couldn't resolve PSRT members from python/devguide (status={resp.status} data={resp.data[:500]})"
-    )
+    rows = csv.reader(resp.data.decode().splitlines())
+    return {github_login.lower() for _, github_login, *_ in rows}
 
 
 def load_psrt_members_from_github(github: GitHub) -> set[str]:
