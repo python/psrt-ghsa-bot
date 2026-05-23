@@ -30,7 +30,6 @@ COMPLETION_TAGS = (
     "NOTPLANNED",
     "INVALID",
     "DUPLICATE",
-    "FIXED",
 )
 
 
@@ -160,7 +159,7 @@ def apply_to_repo(
 
         # If the summary contains a completion tag then we can close the ticket.
         summary = security_advisory.get("summary", "")
-        if re.search(rf"\[(?:{"|".join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
+        if re.search(rf"\[(?:{'|'.join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
             github.rest.security_advisories.update_repository_advisory(
                 owner=owner,
                 repo=repo,

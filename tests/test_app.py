@@ -208,7 +208,6 @@ def test_create_private_fork() -> None:
         "[NOTPLANNED] no fix planned",
         "[INVALID] some annoying spam",
         "[DUPLICATE] we've seen this one before",
-        "[FIXED] already fixed",
     ],
 )
 def test_closes_advisory_with_completion_tag(summary) -> None:
