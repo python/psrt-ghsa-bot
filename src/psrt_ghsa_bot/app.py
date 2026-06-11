@@ -161,6 +161,17 @@ def apply_to_repo(
             print(f"       🧹 Closed {ghsa_id}")
             continue
 
+        # If the summary contains '[ACCEPT{ED}]' we can move the ticket to draft
+        if state == "triage" and re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None:
+            github.rest.security_advisories.update_repository_advisory(
+                owner=owner,
+                repo=repo,
+                ghsa_id=ghsa_id,
+                data={"state": "draft"},
+            )
+            print(f"       ✅ Accepted {ghsa_id}")
+            continue
+
         # Advisories that are in the 'draft' state without a private
         # fork active will have a fork requested.
         if state == "draft" and security_advisory.get("private_fork") is None:
