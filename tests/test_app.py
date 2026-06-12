@@ -229,7 +229,7 @@ def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
 @pytest.mark.parametrize(
     "summary",
     [
-        "[ACCEPT] perl is better than Python",
+        "[ACCEPT] Python is better than C",
         "[ACCEPTED] 0.1 + 0.2 is broken?!?!?!?!?!",
         "fix soemthing in datetime module [ACCEPTED]",
         "blah blah [accepted] lowercase blah",
