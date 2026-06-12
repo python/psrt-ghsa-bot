@@ -166,7 +166,7 @@ def apply_to_repo(
 
         # If the summary contains '[ACCEPT{ED}]' we can move the ticket to draft
         if state == "triage" and re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None:
-            patch_data["state"] = "draft"
+            patch_data["state"] = state = "draft"
             print(f"       ✅ Will accept {ghsa_id}")
 
         # Advisories that are in the 'draft' state without a private

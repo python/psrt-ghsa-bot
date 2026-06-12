@@ -235,11 +235,12 @@ def test_closes_advisory_with_close_or_complete_tag(summary) -> None:
         "blah blah [accepted] lowercase blah",
     ],
 )
-def test_accepts_advisory_with_accept_tag(summary) -> None:
+def test_accepts_advisory_with_accept_tag(summary, cve_id, cve_reserve_response) -> None:
     security_advisory = _create_advisory_dict("triage", None, ["psrt"], summary=summary)
 
     github = mock.Mock()
     cve_api = mock.Mock()
+    cve_api.reserve.return_value = cve_reserve_response
 
     with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
         get_repo_advs.return_value = [security_advisory]
@@ -250,7 +251,7 @@ def test_accepts_advisory_with_accept_tag(summary) -> None:
         owner="owner",
         repo="repo",
         ghsa_id="GHSA-xxxx-xxxx-xxxx",
-        data={"state": "draft"},
+        data={"state": "draft", "cve_id": cve_id},
     )
 
 
