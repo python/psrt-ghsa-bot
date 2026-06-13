@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "quarterly"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    cooldown:
+      # This is currently broken: https://github.com/dependabot/dependabot-core/issues/13078
+      default-days: 14

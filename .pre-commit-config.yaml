@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: e05c5c0818279e5ac248ac9e954431ba58865e61  # frozen: v0.15.7
+    hooks:
+      - id: ruff-check
+        name: Run Ruff (lint)
+        args: [--exit-non-zero-on-fix]
+      - id: ruff-format
+        name: Run Ruff (format)
+        args: [--exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=auto]
+      - id: trailing-whitespace
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: 393031adb9afb225ee52ae2ccd7a5af5525e03e8  # frozen: v1.7.11
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: b546b77c44c466a54a42af5499dcc0dcc1a3193f  # frozen: v1.22.0
+    hooks:
+      - id: zizmor
+
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+      - id: check-useless-excludes
