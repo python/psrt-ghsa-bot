@@ -14,6 +14,7 @@ dependencies = [
 dev = [
     "mock>=5.2.0",
     "pytest>=8.4.2",
+    "pytest-cov>=6.0.0",
     "pytest-sugar>=1.1.1",
     "ruff>=0.14.3",
     "ty>=0.0.1a25",
@@ -38,3 +39,10 @@ indent-style = "space"
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.coverage.run]
+source = ["psrt_ghsa_bot"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
