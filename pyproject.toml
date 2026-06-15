@@ -7,7 +7,6 @@ requires-python = ">=3.14.0"
 dependencies = [
     "cvelib>=1.4.0",
     "githubkit[auth-app]>=0.13.5",
-    "playwright>=1.55.0",
     "python-dotenv>=1.0.0",
 ]
 
@@ -15,7 +14,6 @@ dependencies = [
 dev = [
     "mock>=5.2.0",
     "pytest>=8.4.2",
-    "pytest-playwright>=0.7.1",
     "pytest-sugar>=1.1.1",
     "ruff>=0.14.3",
     "ty>=0.0.1a25",
