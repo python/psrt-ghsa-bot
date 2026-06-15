@@ -45,7 +45,7 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=short --cov=psrt_ghsa_bot --cov-report=term --cov-report=html
+        run: uv run pytest tests/ -v --tb=short --cov=psrt_ghsa_bot --cov=tests --cov-report=term --cov-report=html
 
       - name: Coverage summary
         if: always()
