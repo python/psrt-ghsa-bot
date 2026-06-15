@@ -1,10 +1,6 @@
 name: Run tests
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 env:
   FORCE_COLOR: 1
@@ -16,6 +12,7 @@ jobs:
   test:
     name: Test on Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    if: github.event_name != 'push' || github.event.repository.fork == true
     strategy:
       fail-fast: false
       matrix:
