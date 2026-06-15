@@ -169,6 +169,14 @@ def apply_to_repo(
             print(f"       🧹 Closed {ghsa_id}")
             continue
 
+        # Maintain a dictionary of updates to make and then submit them all at once.
+        patch_data = {}
+
+        # If the summary contains '[ACCEPT{ED}]' we can move the ticket to draft
+        if state == "triage" and re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None:
+            patch_data["state"] = state = "draft"
+            print(f"       ✅ Will accept {ghsa_id}")
+
         # Advisories that are in the 'draft' state without a private
         # fork active will have a fork requested.
         if state == "draft" and security_advisory.get("private_fork") is None:
@@ -182,9 +190,6 @@ def apply_to_repo(
             except RequestFailed as e:
                 print(f"       ⚠️ Error creating private fork: {e.response.json()}")
                 raise e
-
-        # Maintain a dictionary of updates to make and then submit them all at once.
-        patch_data = {}
 
         # Advisories that are in the 'draft' state without a CVE ID
         # should have one allocated by the PSF CVE Numbering Authority.
