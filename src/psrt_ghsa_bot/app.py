@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import re
+import time
 import typing
 import urllib.parse
 
@@ -14,6 +15,15 @@ from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
+
+from psrt_ghsa_bot._sentry_monitoring import (
+    MONITOR_SLUG_GHSA,
+    STATUS_ERROR,
+    STATUS_IN_PROGRESS,
+    STATUS_OK,
+    capture_checkin,
+    init_sentry,
+)
 
 load_dotenv()
 
@@ -236,7 +246,7 @@ def apply_to_repo(
         print("    ℹ️  No security advisories found")
 
 
-def main() -> None:
+def run() -> None:
     print("Starting PSRT GitHub Security Advisory bot...")
     gh_client_private_key = base64.b64decode(os.environ["GH_CLIENT_PRIVATE_KEY"]).decode().strip()
     github = GitHub(
@@ -296,6 +306,21 @@ def main() -> None:
             )
 
     print(f"\nDone! Processed {installation_count} installation(s).")
+
+
+def main() -> None:
+    # Report the cron run to Sentry so we're alerted if it fails or stops running.
+    init_sentry()
+    check_in_id = capture_checkin(MONITOR_SLUG_GHSA, STATUS_IN_PROGRESS)
+    start_time = time.monotonic()
+    try:
+        run()
+    except Exception:
+        capture_checkin(
+            MONITOR_SLUG_GHSA, STATUS_ERROR, duration=time.monotonic() - start_time, check_in_id=check_in_id
+        )
+        raise
+    capture_checkin(MONITOR_SLUG_GHSA, STATUS_OK, duration=time.monotonic() - start_time, check_in_id=check_in_id)
 
 
 if __name__ == "__main__":
