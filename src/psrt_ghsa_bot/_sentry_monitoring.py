@@ -36,5 +36,5 @@ def capture_checkin(monitor_slug, status, duration=None, check_in_id=None):
             duration=duration,
             check_in_id=check_in_id,
         )
-    except (ImportError, AttributeError):
+    except ImportError, AttributeError:
         return None
