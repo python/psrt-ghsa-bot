@@ -17,9 +17,6 @@ from githubkit.exception import RequestFailed, RequestError
 
 load_dotenv()
 
-if typing.TYPE_CHECKING:
-    pass
-
 PSRT_GITHUB_TEAM_ORG = "python"
 PSRT_GITHUB_TEAM_SLUG = "psrt"
 COMPLETION_TAGS = (

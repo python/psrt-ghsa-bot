@@ -1,7 +1,7 @@
 [project]
 name = "psrt-ghsa-bot"
 version = "0.1.0"
-description = "GitHub bot for PSRT activities on GHSA"
+description = "GitHub bot for PSRT activities on GHSAs"
 readme = "README.md"
 requires-python = ">=3.14.0"
 dependencies = [
