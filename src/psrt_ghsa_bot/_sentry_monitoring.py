@@ -16,8 +16,10 @@ def init_sentry() -> None:
     """Initialize the Sentry SDK with the DSN from the env"""
     dsn = os.environ.get("SENTRY_DSN")
     if not dsn:
+        print("No SENTRY_DSN set, skipping Sentry monitoring")
         return
 
+    print("Initializing Sentry monitoring")
     sentry_sdk.init(
         dsn=dsn,
         enable_tracing=False,
