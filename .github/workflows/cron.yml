@@ -44,4 +44,4 @@ jobs:
           CVE_USERNAME: ${{ vars.CVE_USERNAME }}
           CVE_API_KEY: ${{ secrets.CVE_API_KEY }}
           CVE_ENV: ${{ vars.CVE_ENV }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_DSN: ${{ github.event_name == 'schedule' && secrets.SENTRY_DSN || '' }}
