@@ -27,9 +27,6 @@ from psrt_ghsa_bot._sentry_monitoring import (
 
 load_dotenv()
 
-if typing.TYPE_CHECKING:
-    pass
-
 PSRT_GITHUB_TEAM_ORG = "python"
 PSRT_GITHUB_TEAM_SLUG = "psrt"
 COMPLETION_TAGS = (
