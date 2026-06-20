@@ -140,6 +140,18 @@ wheels = [
 ]
 
 [[package]]
+name = "codeowners"
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/98/590929c83f921a75a3153bff3328e143ae900f757dffc722656b58003ba1/codeowners-0.8.0.tar.gz", hash = "sha256:6505727574b67db4832a3d0d5e41c0f7eb80f8858ee27996e85b1e046f9266f8", size = 7749, upload-time = "2025-04-26T02:20:37.743Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/e5/ae08304853f5c6184292e9c679458623c937a2e33d98730ce30fa8f4a8b5/codeowners-0.8.0-py3-none-any.whl", hash = "sha256:b92ce6f6c36dd9de5295c4dc285b2a3b14c81cae8b5eb3b05f0cfdbc4d93995a", size = 8786, upload-time = "2025-04-26T02:20:36.214Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -431,6 +443,7 @@ name = "psrt-ghsa-bot"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "codeowners" },
     { name = "cvelib" },
     { name = "githubkit", extra = ["auth-app"] },
     { name = "python-dotenv" },
@@ -449,6 +462,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "codeowners", specifier = ">=0.8.0" },
     { name = "cvelib", specifier = ">=1.4.0" },
     { name = "githubkit", extras = ["auth-app"], specifier = ">=0.13.5" },
     { name = "python-dotenv", specifier = ">=1.0.0" },

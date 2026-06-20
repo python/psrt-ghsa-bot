@@ -2,6 +2,7 @@ import datetime
 from unittest import mock
 
 import pytest
+from codeowners import CodeOwners
 
 from psrt_ghsa_bot import app
 
@@ -284,3 +285,87 @@ def test_reserve_one_cve_id(cve_reserve_response, cve_id, year) -> None:
     assert app.reserve_one_cve(cve_api) == cve_id
 
     cve_api.reserve.assert_called_with(count=1, year=year, random=True)
+
+
+def test_adds_codeowners_from_changed_files() -> None:
+    code_owners = CodeOwners("""
+Lib/ @StanFromIreland @hugovk
+.github/ @python/psrt
+""")
+    security_advisory = _create_advisory_dict("draft", "CVE-2026-0001", ["psrt"])
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+        mock.patch("psrt_ghsa_bot.app.get_advisory_changed_files") as changed_files,
+    ):
+        get_repo_advs.return_value = [security_advisory]
+        changed_files.return_value = ["Lib/foo.py", ".github/workflows/ci.yml"]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api, code_owners=code_owners)
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={
+            "collaborating_teams": ["psrt", "python/psrt"],
+            "collaborating_users": ["hugovk", "octocat", "stanfromireland"],
+        },
+    )
+
+
+def test_combines_codeowners_and_collaborating_users() -> None:
+    code_owners = CodeOwners("""
+Lib/ @StanFromIreland @hugovk
+.github/ @python/psrt
+""")
+    security_advisory = _create_advisory_dict("draft", "CVE-2026-0001", ["psrt"])
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+        mock.patch("psrt_ghsa_bot.app.get_advisory_changed_files") as changed_files,
+    ):
+        get_repo_advs.return_value = [security_advisory]
+        changed_files.return_value = ["Lib/foo.py"]
+
+        app.apply_to_repo(
+            github,
+            "owner",
+            "repo",
+            cve_api,
+            collaborating_users={"sethmlarson", "hugovk"},
+            code_owners=code_owners,
+        )
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"collaborating_users": ["hugovk", "octocat", "sethmlarson", "stanfromireland"]},
+    )
+
+
+def test_skips_codeowners_lookup_without_private_fork() -> None:
+    code_owners = CodeOwners("""
+Lib/ @StanFromIreland @hugovk
+.github/ @python/psrt
+""")
+    security_advisory = _create_advisory_dict("draft", "CVE-2026-0001", ["psrt"])
+    security_advisory.pop("private_fork", None)
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+        mock.patch("psrt_ghsa_bot.app.get_advisory_changed_files") as changed_files,
+    ):
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api, code_owners=code_owners)
+
+    changed_files.assert_not_called()
+    github.rest.security_advisories.update_repository_advisory.assert_not_called()

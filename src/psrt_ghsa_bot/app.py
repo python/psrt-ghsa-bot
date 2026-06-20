@@ -11,11 +11,17 @@ import typing
 import urllib.parse
 
 import urllib3
+from codeowners import CodeOwners
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
 
+from psrt_ghsa_bot._codeowners import (
+    code_owners_for_files,
+    get_advisory_changed_files,
+    load_codeowners,
+)
 from psrt_ghsa_bot._sentry_monitoring import (
     MONITOR_SLUG_GHSA,
     STATUS_ERROR,
@@ -147,7 +153,13 @@ def reserve_one_cve(cve_api: CveApi) -> str:
 
 
 def apply_to_repo(
-    github: GitHub, owner: str, repo: str, cve_api: CveApi, *, collaborating_users: set[str] | None = None
+    github: GitHub,
+    owner: str,
+    repo: str,
+    cve_api: CveApi,
+    *,
+    collaborating_users: set[str] | None = None,
+    code_owners: CodeOwners | None = None,
 ) -> None:
     """Applies the PSRT GitHub Security Advisory process to the repository."""
     security_advisories = get_repository_advisories(github, owner, repo)
@@ -205,21 +217,36 @@ def apply_to_repo(
             patch_data["cve_id"] = cve_id
             print(f"       ✅ Will reserve CVE ID: {cve_id}")
 
-        collaborating_teams = {team["slug"] for team in security_advisory["collaborating_teams"]}
-        if PSRT_GITHUB_TEAM_SLUG not in collaborating_teams:
-            collaborating_teams.add(PSRT_GITHUB_TEAM_SLUG)
-            patch_data["collaborating_teams"] = sorted(collaborating_teams)
-            print(f"       ➕ Will ensure team present: {PSRT_GITHUB_TEAM_SLUG}")
+        # Resolve the CODEOWNERS for the files changed in the private fork
+        # so they can be added as collaborators on the advisory.
+        codeowner_users = set()
+        codeowner_teams = set()
+        private_fork = security_advisory.get("private_fork")
+        if (code_owners is not None) and (private_fork is not None):
+            changed_files = get_advisory_changed_files(github, private_fork)
+            codeowner_users, codeowner_teams = code_owners_for_files(code_owners, changed_files)
+            if codeowner_users or codeowner_teams:
+                print(
+                    f"       👥 CODEOWNERS for changed files: "
+                    f"users={sorted(codeowner_users)} teams={sorted(codeowner_teams)}"
+                )
 
-        if collaborating_users:
+        teams_to_add = {PSRT_GITHUB_TEAM_SLUG} | codeowner_teams
+        collaborating_teams = {team["slug"] for team in security_advisory["collaborating_teams"]}
+        if teams_to_add - collaborating_teams:
+            patch_data["collaborating_teams"] = sorted(collaborating_teams | teams_to_add)
+            print(f"       ➕ Will ensure teams present: {sorted(teams_to_add)}")
+
+        users_to_add = (collaborating_users or set()) | codeowner_users
+        if users_to_add:
             # Determine if we set the 'collaborating_users' field
             # at all by seeing if there are missing users on the
             # advisory. Preserve the old list, as this is edited
             # manually by coordinators.
             prev_collaborating_users = {user["login"].lower() for user in security_advisory["collaborating_users"]}
-            if collaborating_users - prev_collaborating_users:
+            if users_to_add - prev_collaborating_users:
                 # Sorting is only done for consistency's sake in testing.
-                new_collaborating_users = sorted(collaborating_users | prev_collaborating_users)
+                new_collaborating_users = sorted(users_to_add | prev_collaborating_users)
                 patch_data["collaborating_users"] = new_collaborating_users
                 print(f"       ➕ Will ensure users are present: {new_collaborating_users}")
 
@@ -298,8 +325,14 @@ def run() -> None:
         )
         for repo in repos:
             print(f"  Checking repo: {repo.owner.login}/{repo.name}")
+            code_owners = load_codeowners(installation_github, repo.owner.login, repo.name)
             apply_to_repo(
-                installation_github, repo.owner.login, repo.name, cve_api, collaborating_users=collaborating_users
+                installation_github,
+                repo.owner.login,
+                repo.name,
+                cve_api,
+                collaborating_users=collaborating_users,
+                code_owners=code_owners,
             )
 
     print(f"\nDone! Processed {installation_count} installation(s).")
