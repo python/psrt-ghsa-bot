@@ -20,6 +20,7 @@ from psrt_ghsa_bot._sentry_monitoring import (
     STATUS_IN_PROGRESS,
     STATUS_OK,
     capture_checkin,
+    capture_exception,
     init_sentry,
 )
 
@@ -89,7 +90,9 @@ def get_repository_advisories(
         # 404 means no advisories or no access - that's okay
         if e.response.status_code == 404:
             return
-        raise
+        # Capture the original exception in Sentry (private)
+        # and emit a sanitized public exception.
+        capture_exception()
 
 
 def github_client_request(client: typing.Any, method: str, url: str, params: dict[str, str | int]) -> typing.Any:
@@ -161,9 +164,11 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
                     repo=repo,
                     ghsa_id=ghsa_id,
                 )
-            except RequestFailed as e:
-                print(f"       ⚠️ Error creating private fork: {e.response.json()}")
-                raise e
+            except RequestFailed:
+                # Capture the original exception in Sentry (private)
+                # and emit a sanitized public exception.
+                capture_exception()
+                raise RuntimeError("Request to create a private fork failed") from None
 
         # Advisories that are in the 'draft' state without a CVE ID
         # should have one allocated by the PSF CVE Numbering Authority.
@@ -187,9 +192,11 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
                     ghsa_id=ghsa_id,
                     data=patch_data,
                 )
-            except RequestFailed as e:
-                print(f"       ⚠️ Error updating advisory: {e.response.json()}")
-                raise e
+            except RequestFailed:
+                # Capture the original exception in Sentry (private)
+                # and emit a sanitized public exception.
+                capture_exception()
+                raise RuntimeError("Request to update advisory failed") from None
             print("       💾 Updated advisory")
         else:
             print("       ⏭️  No updates needed")

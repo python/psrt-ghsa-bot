@@ -26,7 +26,7 @@ def init_sentry() -> None:
     )
 
 
-def capture_checkin(monitor_slug, status, duration=None, check_in_id=None):
+def capture_checkin(monitor_slug, status, duration=None, check_in_id=None) -> None | str:
     """Capture a Sentry cron check-in."""
     if not os.environ.get("SENTRY_DSN"):
         return None
@@ -40,3 +40,10 @@ def capture_checkin(monitor_slug, status, duration=None, check_in_id=None):
         )
     except ImportError, AttributeError:
         return None
+
+
+def capture_exception() -> None:
+    """Capture an exception if Sentry is active."""
+    if not os.environ.get("SENTRY_DSN"):
+        return
+    sentry_sdk.capture_exception()
