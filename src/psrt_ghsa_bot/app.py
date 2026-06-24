@@ -93,6 +93,7 @@ def get_repository_advisories(
         # Capture the original exception in Sentry (private)
         # and emit a sanitized public exception.
         capture_exception()
+        raise RuntimeError("Request to paginate advisories failed.")
 
 
 def github_client_request(client: typing.Any, method: str, url: str, params: dict[str, str | int]) -> typing.Any:
