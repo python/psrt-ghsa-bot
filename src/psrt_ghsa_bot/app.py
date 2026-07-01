@@ -242,14 +242,14 @@ def run() -> None:
             map_func=lambda r: r.parsed_data.repositories,
         )
         for repo in repos:
-            name = f"{repo.owner.login}/{repo.name}"
-            print(f"Processing repo: {name}")
+            slug = f"{repo.owner.login}/{repo.name}"
+            print(f"Processing repo: {slug}")
             apply_to_repo(
                 installation_github,
                 repo.owner.login,
                 repo.name,
                 cve_api,
-                reserve_cves=name in cve_enabled_repos,
+                reserve_cves=slug in cve_enabled_repos,
             )
 
     print(f"\nDone! Processed {installation_count} installation(s).")
