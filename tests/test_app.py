@@ -259,3 +259,27 @@ def test_reserve_one_cve_id(cve_reserve_response, cve_id, year) -> None:
     assert app.reserve_one_cve(cve_api) == cve_id
 
     cve_api.reserve.assert_called_with(count=1, year=year, random=True)
+
+
+def test_only_processes_installations_for_required_org(monkeypatch) -> None:
+    monkeypatch.setenv("GH_CLIENT_ID", "123")
+    monkeypatch.setenv("GH_CLIENT_PRIVATE_KEY", "a2V5")
+    monkeypatch.setenv("CVE_USERNAME", "stan@python.org")
+    monkeypatch.setenv("CVE_API_KEY", "key")
+    monkeypatch.setenv("REQUIRED_ORG", "python")
+
+    github = mock.Mock()
+    github.rest.paginate.return_value = [
+        mock.Mock(id=1, account=mock.Mock(login="evil-org")),
+        mock.Mock(id=2, account=mock.Mock(login="python")),
+    ]
+    github.with_auth.return_value.rest.paginate.return_value = []
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.GitHub", return_value=github),
+        mock.patch("psrt_ghsa_bot.app.CveApi"),
+        mock.patch("psrt_ghsa_bot.app.apply_to_repo"),
+    ):
+        app.run()
+
+    github.auth.as_installation.assert_called_once_with(2)

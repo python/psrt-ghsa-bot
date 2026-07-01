@@ -223,6 +223,8 @@ def run() -> None:
         name.strip() for name in (os.environ.get("CVE_ENABLED_REPOS") or "python/cpython").split(",") if name.strip()
     )
 
+    required_org = os.environ["REQUIRED_ORG"]
+
     print("Fetching installations...")
     # Apply to all repositories for each installation.
     installations = github.rest.paginate(
@@ -230,8 +232,13 @@ def run() -> None:
     )
     installation_count = 0
     for installation_data in installations:
+        account_login = installation_data.account.login
+        if account_login.lower() != required_org.lower():
+            print(f"\n⏭️  Skipping installation for {account_login!r} (not {required_org!r})")
+            continue
+
         installation_count += 1
-        print(f"\nProcessing installation {installation_count}: {installation_data.account.login}")
+        print(f"\nProcessing installation {installation_count}: {account_login}")
 
         installation_github = github.with_auth(
             github.auth.as_installation(installation_data.id),
