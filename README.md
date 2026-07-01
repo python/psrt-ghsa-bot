@@ -5,7 +5,11 @@ PSRT GHSA Bot is a GitHub App that automates the [Python Security Response Team
 handling of GitHub Security Advisories. It runs hourly (or by manual dispatch)
 and, for every advisory it closes ones marked as completed, promotes accepted ones
 from triage to draft, reserves CVE IDs, creates private forks, and adds the
-PSRT members as collaborators.
+PSRT team as collaborators.
+
+It processes every repository the GitHub App is installed on.
+The process is identical across repositories except that CVE IDs are only
+reserved for repositories listed in the `CVE_ENABLED_REPOS` environment variable.
 
 ```mermaid
 flowchart TD

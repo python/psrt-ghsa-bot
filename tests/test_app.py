@@ -156,6 +156,21 @@ def test_does_not_reserve_cve_id_for_triage_security_advisories(state) -> None:
         github.rest.security_advisories.update_repository_advisory.assert_not_called()
 
 
+def test_does_not_reserve_cve_id_when_reserve_cves_disabled() -> None:
+    security_advisory = _create_advisory_dict("draft", None, ["psrt"])
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api, reserve_cves=False)
+
+    cve_api.reserve.assert_not_called()
+    github.rest.security_advisories.update_repository_advisory.assert_not_called()
+
+
 def test_create_private_fork() -> None:
     github = mock.Mock()
     cve_api = mock.Mock()

@@ -119,7 +119,7 @@ def reserve_one_cve(cve_api: CveApi) -> str:
     return cve_ids[0]
 
 
-def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> None:
+def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, reserve_cves: bool = True) -> None:
     """Applies the PSRT GitHub Security Advisory process to the repository."""
     security_advisories = get_repository_advisories(github, owner, repo)
     advisory_count = 0
@@ -173,7 +173,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi) -> Non
 
         # Advisories that are in the 'draft' state without a CVE ID
         # should have one allocated by the PSF CVE Numbering Authority.
-        if state == "draft" and security_advisory.get("cve_id") is None:
+        if reserve_cves and state == "draft" and security_advisory.get("cve_id") is None:
             cve_id = reserve_one_cve(cve_api)
             patch_data["cve_id"] = cve_id
             print(f"       ✅ Will reserve CVE ID: {cve_id}")
@@ -219,6 +219,10 @@ def run() -> None:
         env=os.environ.get("CVE_ENV", "prod"),
     )
 
+    cve_enabled_repos = frozenset(
+        name.strip() for name in (os.environ.get("CVE_ENABLED_REPOS") or "python/cpython").split(",") if name.strip()
+    )
+
     print("Fetching installations...")
     # Apply to all repositories for each installation.
     installations = github.rest.paginate(
@@ -238,8 +242,15 @@ def run() -> None:
             map_func=lambda r: r.parsed_data.repositories,
         )
         for repo in repos:
-            print(f"  Checking repo: {repo.owner.login}/{repo.name}")
-            apply_to_repo(installation_github, repo.owner.login, repo.name, cve_api)
+            name = f"{repo.owner.login}/{repo.name}"
+            print(f"Processing repo: {name}")
+            apply_to_repo(
+                installation_github,
+                repo.owner.login,
+                repo.name,
+                cve_api,
+                reserve_cves=name in cve_enabled_repos,
+            )
 
     print(f"\nDone! Processed {installation_count} installation(s).")
 
