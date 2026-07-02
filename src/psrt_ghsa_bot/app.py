@@ -223,7 +223,7 @@ def run() -> None:
         name.strip() for name in (os.environ.get("CVE_ENABLED_REPOS") or "python/cpython").split(",") if name.strip()
     )
 
-    required_org = os.environ["REQUIRED_ORG"]
+    required_org = os.environ["GH_REQUIRED_ORG"]
 
     print("Fetching installations...")
     # Apply to all repositories for each installation.

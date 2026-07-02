@@ -7,7 +7,7 @@ and, for every advisory it closes ones marked as completed, promotes accepted on
 from triage to draft, reserves CVE IDs, creates private forks, and adds the
 PSRT team as collaborators.
 
-It only processes installations owned by the account named in the `REQUIRED_ORG`
+It only processes installations owned by the account named in the `GH_REQUIRED_ORG`
 environment variable; installations under any other user are skipped.
 For that account it processes every repository the GitHub App is installed on.
 The process is identical across repositories except that CVE IDs are only

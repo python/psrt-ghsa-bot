@@ -266,7 +266,7 @@ def test_only_processes_installations_for_required_org(monkeypatch) -> None:
     monkeypatch.setenv("GH_CLIENT_PRIVATE_KEY", "a2V5")
     monkeypatch.setenv("CVE_USERNAME", "stan@python.org")
     monkeypatch.setenv("CVE_API_KEY", "key")
-    monkeypatch.setenv("REQUIRED_ORG", "python")
+    monkeypatch.setenv("GH_REQUIRED_ORG", "python")
 
     github = mock.Mock()
     github.rest.paginate.return_value = [
