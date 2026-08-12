@@ -317,6 +317,32 @@ def test_get_security_advisory_credits():
     ]
 
 
+def test_get_security_advisory_credits_self_review():
+    github = mock.Mock()
+
+    pulls_list = mock.Mock()
+    pulls_list.content = json.dumps([{"number": 1, "user": {"login": "author"}}])
+    github.rest.pulls.list.return_value = pulls_list
+
+    reviews_list = mock.Mock()
+    reviews_list.content = json.dumps([{"user": {"login": "author"}}])
+    github.rest.pulls.list_reviews.return_value = reviews_list
+
+    credits = app.get_security_advisory_credits(
+        github=github,
+        security_advisory={
+            "private_fork": {
+                "owner": {"login": "fork-owner"},
+                "name": "fork-name",
+            },
+            "credits": [],
+        },
+    )
+
+    # Developer is favored over reviewer.
+    assert credits == [{"login": "author", "type": "remediation_developer"}]
+
+
 def test_reserve_one_cve_id(cve_reserve_response, cve_id, year) -> None:
     cve_api = mock.Mock()
     cve_api.reserve.return_value = cve_reserve_response

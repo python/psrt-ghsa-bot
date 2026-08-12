@@ -137,8 +137,9 @@ def get_security_advisory_credits(
 
         for pull_request in pull_requests:
             # fmt: off
+            pull_request_author = pull_request["user"]["login"]
             credit_if_uncredited(
-                login=pull_request["user"]["login"],
+                login=pull_request_author,
                 type="remediation_developer"
             )
             # fmt: on
@@ -155,8 +156,11 @@ def get_security_advisory_credits(
                 raise RuntimeError("Request to list pull requests reviews failed") from None
 
             for review in reviews:
+                review_login = review["user"]["login"]
+                if review_login == pull_request_author:
+                    continue  # Developers can't be reviewers too.
                 credit_if_uncredited(
-                    login=review["user"]["login"],
+                    login=review_login,
                     type="remediation_reviewer",
                 )
 
