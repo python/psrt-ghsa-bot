@@ -104,14 +104,13 @@ def get_security_advisory_credits(
     advisory, such as developing or reviewing a remediation.
     Respects credits that already exist on an advisory.
     """
-
-    credits = []
+    credits = (security_advisory.get("credits", None) or [])[:]
 
     def credit_if_uncredited(login: str, type: str) -> None:
         # GHSA only allows one credit type per user,
         # so we don't want to overwrite existing credits.
         nonlocal credits
-        if any(c["login"] == login for c in (security_advisory["credits"] + credits)):
+        if any(c["login"].lower() == login.lower() for c in credits):
             return
         credits.append(
             {
@@ -124,13 +123,18 @@ def get_security_advisory_credits(
         private_fork_owner = private_fork["owner"]["login"]
         private_fork_repo = private_fork["name"]
 
-        pull_requests = json.loads(
-            github.rest.pulls.list(
-                owner=private_fork_owner,
-                repo=private_fork_repo,
-                state="open",
-            ).content
-        )
+        try:
+            pull_requests = json.loads(
+                github.rest.pulls.list(
+                    owner=private_fork_owner,
+                    repo=private_fork_repo,
+                    state="open",
+                ).content
+            )
+        except RequestFailed:
+            capture_exception()
+            raise RuntimeError("Request to list pull requests failed") from None
+
         for pull_request in pull_requests:
             # fmt: off
             credit_if_uncredited(
@@ -138,20 +142,25 @@ def get_security_advisory_credits(
                 type="remediation_developer"
             )
             # fmt: on
-            reviews = json.loads(
-                github.rest.pulls.list_reviews(
-                    owner=private_fork_owner,
-                    repo=private_fork_repo,
-                    pull_number=pull_request["number"],
-                ).content
-            )
+            try:
+                reviews = json.loads(
+                    github.rest.pulls.list_reviews(
+                        owner=private_fork_owner,
+                        repo=private_fork_repo,
+                        pull_number=pull_request["number"],
+                    ).content
+                )
+            except RequestFailed:
+                capture_exception()
+                raise RuntimeError("Request to list pull requests reviews failed") from None
+
             for review in reviews:
                 credit_if_uncredited(
                     login=review["user"]["login"],
                     type="remediation_reviewer",
                 )
 
-    return credits
+    return sorted(credits, key=lambda c: (c["login"], c["type"]))
 
 
 def github_client_request(client: typing.Any, method: str, url: str, params: dict[str, str | int]) -> typing.Any:

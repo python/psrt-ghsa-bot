@@ -309,9 +309,10 @@ def test_get_security_advisory_credits():
         },
     )
 
-    # reviewer1 is skipped because they are already coordinator.
+    # reviewer1 is kept as 'coordinator', not 'remediation_reviewer'.
     assert credits == [
         {"login": "author", "type": "remediation_developer"},
+        {"login": "reviewer1", "type": "coordinator"},
         {"login": "reviewer2", "type": "remediation_reviewer"},
     ]
 
