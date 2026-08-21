@@ -109,7 +109,6 @@ def get_security_advisory_credits(
     def credit_if_uncredited(login: str, type: str) -> None:
         # GHSA only allows one credit type per user,
         # so we don't want to overwrite existing credits.
-        nonlocal credits
         if any(c["login"].lower() == login.lower() for c in credits):
             return
         credits.append(
@@ -264,6 +263,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
         new_credits = get_security_advisory_credits(github, security_advisory)
         if new_credits and existing_credits != new_credits:
             patch_data["credits"] = new_credits
+            print(f"       📋 Will add credits for developing and reviewing remediation")
 
         # Apply updates, if any, to the security advisory.
         if patch_data:
