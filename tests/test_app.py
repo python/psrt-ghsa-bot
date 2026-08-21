@@ -282,6 +282,7 @@ def test_get_security_advisory_credits_no_prs():
         owner="fork-owner",
         repo="fork-name",
         state="open",
+        per_page=100,
     )
 
 
@@ -341,6 +342,56 @@ def test_get_security_advisory_credits_self_review():
 
     # Developer is favored over reviewer.
     assert credits == [{"login": "author", "type": "remediation_developer"}]
+
+
+@pytest.mark.parametrize("remove_credits", [(), ("reviewer1",), ("reviewer1", "reviewer2")])
+def test_get_security_advisory_credits_no_change(remove_credits: tuple[str, ...]) -> None:
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    pulls_list = mock.Mock()
+    pulls_list.content = json.dumps([{"number": 1, "user": {"login": "author"}}])
+    github.rest.pulls.list.return_value = pulls_list
+
+    reviews_list = mock.Mock()
+    reviews_list.content = json.dumps([{"user": {"login": "reviewer1"}}, {"user": {"login": "reviewer2"}}])
+    github.rest.pulls.list_reviews.return_value = reviews_list
+
+    security_advisory = _create_advisory_dict("draft", "CVE-2026-1234", ["psrt"])
+    security_advisory["private_fork"] = {
+        "owner": {"login": "fork-owner"},
+        "name": "fork-name",
+    }
+    security_advisory["credits"] = [
+        # Deliberately out of sorting order.
+        {"login": "reviewer2", "type": "remediation_reviewer"},
+        {"login": "author", "type": "remediation_developer"},
+        {"login": "reviewer1", "type": "coordinator"},
+    ]
+
+    if remove_credits:
+        security_advisory["credits"] = [c for c in security_advisory["credits"] if c["login"] not in remove_credits]
+
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [security_advisory]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    if remove_credits:
+        github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+            owner="owner",
+            repo="repo",
+            ghsa_id="GHSA-xxxx-xxxx-xxxx",
+            data={
+                "credits": [
+                    {"login": "author", "type": "remediation_developer"},
+                    {"login": "reviewer1", "type": "remediation_reviewer"},
+                    {"login": "reviewer2", "type": "remediation_reviewer"},
+                ]
+            },
+        )
+    else:  # Nothing to update.
+        github.rest.security_advisories.update_repository_advisory.assert_not_called()
 
 
 def test_reserve_one_cve_id(cve_reserve_response, cve_id, year) -> None:
