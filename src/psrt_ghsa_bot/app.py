@@ -134,9 +134,14 @@ def get_security_advisory_credits(
                     per_page=100,
                 ).content
             )
-        except RequestFailed:
-            capture_exception()
-            raise RuntimeError("Request to list pull requests failed") from None
+        except RequestFailed as e:
+            # If there are no pull requests the API
+            # returns 404. Skip instead of erroring.
+            if e.response.status_code == 404:
+                pull_requests = []
+            else:
+                capture_exception()
+                raise RuntimeError("Request to list pull requests failed") from None
 
         for pull_request in pull_requests:
             pull_request_author = pull_request["user"]["login"]
@@ -149,7 +154,11 @@ def get_security_advisory_credits(
                         pull_number=pull_request["number"],
                     ).content
                 )
-            except RequestFailed:
+            except RequestFailed as e:
+                # If there are no pull request reviews the API
+                # returns 404. Skip instead of erroring.
+                if e.response.status_code == 404:
+                    continue
                 capture_exception()
                 raise RuntimeError("Request to list pull requests reviews failed") from None
 
