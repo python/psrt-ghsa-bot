@@ -138,6 +138,9 @@ def get_security_advisory_credits(
             # If there are no pull requests the API
             # returns 404. Skip instead of erroring.
             if e.response.status_code == 404:
+                print(
+                    f"       ⚠️  Pull requests not found for {private_fork_owner}/{private_fork_repo}!"
+                )
                 pull_requests = []
             else:
                 capture_exception()
@@ -158,6 +161,9 @@ def get_security_advisory_credits(
                 # If there are no pull request reviews the API
                 # returns 404. Skip instead of erroring.
                 if e.response.status_code == 404:
+                    print(
+                        f"       ⚠️  Reviews not found for {private_fork_owner}/{private_fork_repo}#{pull_request['number']}!"
+                    )
                     continue
                 capture_exception()
                 raise RuntimeError("Request to list pull requests reviews failed") from None
