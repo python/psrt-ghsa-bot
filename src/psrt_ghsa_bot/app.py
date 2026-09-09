@@ -138,9 +138,7 @@ def get_security_advisory_credits(
             # If there are no pull requests the API
             # returns 404. Skip instead of erroring.
             if e.response.status_code == 404:
-                print(
-                    f"       ⚠️  Pull requests not found for {private_fork_owner}/{private_fork_repo}!"
-                )
+                print(f"       ⚠️  Pull requests not found for {private_fork_owner}/{private_fork_repo}!")
                 pull_requests = []
             else:
                 capture_exception()
