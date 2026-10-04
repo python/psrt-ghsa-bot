@@ -3,6 +3,7 @@ import json
 from unittest import mock
 
 import pytest
+from githubkit.exception import RequestFailed
 
 from psrt_ghsa_bot import app
 
@@ -44,6 +45,16 @@ def _create_advisory_dict(state, cve_id, collaborating_teams, summary=""):
         "cve_id": cve_id,
         "collaborating_teams": [{"slug": team} for team in collaborating_teams],
         "collaborating_users": [{"login": "octocat", "id": 1, "type": "User"}],
+    }
+
+
+def _create_comment_dict(body, author_association="MEMBER"):
+    """Helper to create a GHSA comment dictionary."""
+    return {
+        "id": 1,
+        "body": body,
+        "user": {"login": "octocat"},
+        "author_association": author_association,
     }
 
 
@@ -250,6 +261,114 @@ def test_accepts_advisory_with_accept_tag(summary, cve_id, cve_reserve_response)
         ghsa_id="GHSA-xxxx-xxxx-xxxx",
         data={"state": "draft", "cve_id": cve_id},
     )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "!close",
+        "!CLOSE",
+        "!close  ",
+        "This is a duplicate.\r\n\r\n!close\r\n",
+        "!accept\n!close",
+    ],
+)
+def test_closes_advisory_with_close_command(body) -> None:
+    security_advisory = _create_advisory_dict("triage", None, [])
+    security_advisory["comments"] = 1
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+        mock.patch("psrt_ghsa_bot.app.get_advisory_comments") as get_adv_comments,
+    ):
+        get_repo_advs.return_value = [security_advisory]
+        get_adv_comments.return_value = [_create_comment_dict(body)]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    get_adv_comments.assert_called_once_with(github, "owner", "repo", "GHSA-xxxx-xxxx-xxxx")
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"state": "closed"},
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "!accept",
+        "!Accept",
+        "Looks valid to me.\n\n!accept",
+        "!close\n!accept",
+    ],
+)
+def test_accepts_advisory_with_accept_command(body, cve_id, cve_reserve_response) -> None:
+    security_advisory = _create_advisory_dict("triage", None, ["psrt"])
+    security_advisory["comments"] = 1
+
+    github = mock.Mock()
+    cve_api = mock.Mock()
+    cve_api.reserve.return_value = cve_reserve_response
+
+    with (
+        mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs,
+        mock.patch("psrt_ghsa_bot.app.get_advisory_comments") as get_adv_comments,
+    ):
+        get_repo_advs.return_value = [security_advisory]
+        get_adv_comments.return_value = [_create_comment_dict(body)]
+
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
+        owner="owner",
+        repo="repo",
+        ghsa_id="GHSA-xxxx-xxxx-xxxx",
+        data={"state": "draft", "cve_id": cve_id},
+    )
+
+
+@pytest.mark.parametrize(
+    ("comments", "command"),
+    [
+        ([], None),
+        ([_create_comment_dict("Thanks for the report!")], None),
+        ([_create_comment_dict("!close")], "close"),
+        ([_create_comment_dict("!accept")], "accept"),
+        ([_create_comment_dict("!accept"), _create_comment_dict("!close")], "close"),
+        ([_create_comment_dict("!close"), _create_comment_dict("!accept")], "accept"),
+        ([_create_comment_dict("!close"), _create_comment_dict("unrelated")], "close"),
+        ([_create_comment_dict("please !close this")], None),
+        ([_create_comment_dict("> !close")], None),
+        ([_create_comment_dict("!closed")], None),
+        ([_create_comment_dict(None)], None),
+        ([_create_comment_dict("!close", author_association="NONE")], None),
+        ([_create_comment_dict("!accept", author_association="CONTRIBUTOR")], None),
+        ([_create_comment_dict("!accept", author_association="COLLABORATOR")], None),
+        ([_create_comment_dict("!accept", author_association="OWNER")], "accept"),
+        (
+            [_create_comment_dict("!close"), _create_comment_dict("!accept", author_association="NONE")],
+            "close",
+        ),
+    ],
+)
+def test_get_advisory_command(comments, command) -> None:
+    assert app.get_advisory_command(comments) == command
+
+
+def test_get_advisory_comments_not_found() -> None:
+    github = mock.Mock()
+
+    with mock.patch("psrt_ghsa_bot.app.github_client_request") as client_request:
+        client_request.side_effect = RequestFailed(mock.Mock(status_code=404))
+
+        comments = app.get_advisory_comments(github, "owner", "repo", "GHSA-xxxx-xxxx-xxxx")
+
+    assert comments == []
 
 
 def test_get_security_advisory_credits_no_private_fork():

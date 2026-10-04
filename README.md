@@ -26,9 +26,9 @@ flowchart TD
     Collab -- yes --> AddCollab[Add PSRT as collaborators]:::write --> Tag
     Collab -- no --> Tag
 
-    Tag{"Summary has a completion tag?"}:::decision
+    Tag{"Summary has a completion tag or latest command is !close?"}:::decision
     Tag -- yes --> Close[Close advisory]:::write --> Done([Continue to next advisory]):::terminal
-    Tag -- "No, Triage" --> Accept{"Summary has an accept tag?"}:::decision
+    Tag -- "No, Triage" --> Accept{"Summary has an accept tag or latest command is !accept?"}:::decision
     Tag -- "No, Draft" --> Fork
 
     Accept -- yes --> ToDraft[Move to the draft state]:::write --> Fork
