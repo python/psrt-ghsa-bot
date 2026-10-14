@@ -36,8 +36,6 @@ COMPLETION_TAGS = (
     "INVALID",
     "DUPLICATE",
 )
-COMMAND_AUTHOR_ASSOCIATIONS = ("OWNER", "MEMBER")
-COMMAND_RE = re.compile(r"^!(close|accept)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
 def get_repository_advisories(
@@ -132,12 +130,17 @@ def get_advisory_comments(
 def get_advisory_command(comments: typing.Iterable[dict[str, typing.Any]]) -> str | None:
     """Finds the most recent command issued by an organization member in the
     comments of a security advisory.
+
+    There is no tracking of which commands have already been executed, so
+    every command must be idempotent.
     """
+    author_associations = ("OWNER", "MEMBER")
+    command_re = re.compile(r"^!(close|accept)\s*$", re.IGNORECASE | re.MULTILINE)
     command = None
     for comment in comments:
-        if comment.get("author_association") not in COMMAND_AUTHOR_ASSOCIATIONS:
+        if comment.get("author_association") not in author_associations:
             continue
-        for name in COMMAND_RE.findall(comment.get("body") or ""):
+        for name in command_re.findall(comment.get("body") or ""):
             command = name.lower()
     return command
 
@@ -288,9 +291,8 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
 
-        # If the summary contains '[ACCEPT{ED}]' or the latest
-        # command is '!accept' we can move the ticket to draft.
-        if state == "triage" and (command == "accept" or re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None):
+        # If the latest command is '!accept' we can move the ticket to draft.
+        if state == "triage" and command == "accept":
             patch_data["state"] = state = "draft"
             print(f"       ✅ Will accept {ghsa_id}")
 
