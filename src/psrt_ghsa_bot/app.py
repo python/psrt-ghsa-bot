@@ -96,6 +96,55 @@ def get_repository_advisories(
         raise RuntimeError("Request to paginate advisories failed.")
 
 
+def get_advisory_comments(
+    github: GitHub,
+    owner: str,
+    repo: str,
+    ghsa_id: str,
+) -> list[dict[str, typing.Any]]:
+    """Lists comments on a repository security advisory using the REST API."""
+    comments = []
+    page = 1
+    try:
+        while True:
+            response = github_client_request(
+                client=github.rest.security_advisories,
+                method="GET",
+                url=f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}/comments",
+                params={"per_page": 100, "page": page},
+            )
+            page_comments = json.loads(response.content)
+            comments.extend(page_comments)
+            if len(page_comments) < 100:
+                break
+            page += 1
+    except RequestFailed as e:
+        if e.response.status_code == 404:
+            print(f"       ⚠️  Comments not found for {ghsa_id}!")
+            return []
+        capture_exception()
+        raise RuntimeError("Request to list advisory comments failed") from None
+    return comments
+
+
+def get_advisory_command(comments: typing.Iterable[dict[str, typing.Any]]) -> str | None:
+    """Finds the most recent command issued by an organization member in the
+    comments of a security advisory.
+
+    There is no tracking of which commands have already been executed, so
+    every command must be idempotent.
+    """
+    author_associations = ("OWNER", "MEMBER")
+    command_re = re.compile(r"^!(close|accept)\s*$", re.IGNORECASE | re.MULTILINE)
+    command = None
+    for comment in comments:
+        if comment.get("author_association") not in author_associations:
+            continue
+        for name in command_re.findall(comment.get("body") or ""):
+            command = name.lower()
+    return command
+
+
 def get_security_advisory_credits(
     github: GitHub,
     security_advisory: dict[str, typing.Any],
@@ -222,9 +271,14 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
 
-        # If the summary contains a completion tag then we can close the ticket.
+        command = None
+        if security_advisory.get("comments"):
+            command = get_advisory_command(get_advisory_comments(github, owner, repo, ghsa_id))
+
+        # If the summary contains a completion tag or the latest
+        # command is '!close' then we can close the ticket.
         summary = security_advisory.get("summary", "")
-        if re.search(rf"\[(?:{'|'.join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
+        if command == "close" or re.search(rf"\[(?:{'|'.join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
             github.rest.security_advisories.update_repository_advisory(
                 owner=owner,
                 repo=repo,
@@ -237,8 +291,8 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
 
-        # If the summary contains '[ACCEPT{ED}]' we can move the ticket to draft
-        if state == "triage" and re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None:
+        # If the latest command is '!accept' we can move the ticket to draft.
+        if state == "triage" and command == "accept":
             patch_data["state"] = state = "draft"
             print(f"       ✅ Will accept {ghsa_id}")
 
