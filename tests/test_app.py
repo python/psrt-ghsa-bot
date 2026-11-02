@@ -525,3 +525,22 @@ def test_ghsa_closed_on_cve_patch(show_cve_response, tags, cve_id) -> None:
         new_state = None
     check_state = operator.eq if "patch" in tags else operator.ne
     assert check_state(new_state, "closed")
+
+
+@pytest.mark.parametrize("state", ["closed", "published", "triage"])
+def test_only_draft_ghsa_closed_on_cve(show_cve_response, state) -> None:
+    show_cve_response["containers"]["cna"]["references"] = list(_build_cve_references(["patch"]))
+    github = mock.Mock()
+    cve_api = mock.Mock()
+    cve_api.show_cve_record.return_value = show_cve_response
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [_create_advisory_dict(state, cve_id, [])]
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    update = github.rest.security_advisories.update_repository_advisory.call_args
+    try:
+        new_state = update.kwargs["data"]["state"]
+    except AttributeError, KeyError:
+        pass  # We're testing the state didn't change, so no update is good.
+    else:
+        assert new_state == state
