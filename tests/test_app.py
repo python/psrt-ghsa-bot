@@ -1,6 +1,5 @@
 import datetime
 import json
-import operator
 from collections import abc
 from unittest import mock
 
@@ -523,8 +522,7 @@ def test_ghsa_closed_on_cve_patch(show_cve_response, tags, cve_id) -> None:
         new_state = update.kwargs["data"]["state"]
     except AttributeError, KeyError:
         new_state = None
-    check_state = operator.eq if "patch" in tags else operator.ne
-    assert check_state(new_state, "closed")
+    assert (new_state == "closed") == ("patch" in tags)
 
 
 @pytest.mark.parametrize("state", ["closed", "published", "triage"])
