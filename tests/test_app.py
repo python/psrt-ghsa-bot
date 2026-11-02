@@ -1,10 +1,15 @@
 import datetime
 import json
+import operator
+from collections import abc
 from unittest import mock
 
 import pytest
 
 from psrt_ghsa_bot import app
+
+PSF_CNA_UUID = "28c92f92-d60d-412d-b760-e73465c3df22"
+PSF_CNA_SHORTNAME = "PSF"
 
 
 @pytest.fixture
@@ -33,6 +38,72 @@ def cve_reserve_response(cve_id, year):
             },
         ],
     }
+
+
+def cve_isoformat(date_time: datetime.datetime) -> str:
+    naive_utc = date_time.astimezone(datetime.UTC).replace(tzinfo=None)
+    return f"{naive_utc.isoformat(timespec='milliseconds')}Z"
+
+
+@pytest.fixture
+def show_cve_response(cve_id):
+    # See <https://github.com/CVEProject/cve-services/blob/dev/schemas/CVE_JSON_5.2.0_bundled.json>
+    # referenced from <https://github.com/CVEProject/cve-services/blob/dev/schemas/cve/get-cve-record-response.json>
+    # This is very incomplete for now but can be expanded as we introspect more
+    # fields.
+    date_updated = datetime.datetime.now(tz=datetime.UTC)
+    return {
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.2",
+        "cveMetadata": {
+            "cveId": cve_id,
+            "assignerOrgId": PSF_CNA_UUID,
+            "state": "PUBLISHED",
+            "assignerShortName": PSF_CNA_SHORTNAME,
+            "dateReserved": cve_isoformat(date_updated - datetime.timedelta(hours=60)),
+            "datePublished": cve_isoformat(date_updated - datetime.timedelta(hours=30)),
+            "dateUpdated": cve_isoformat(date_updated),
+        },
+        "containers": {
+            "cna": {
+                "credits": [
+                    {
+                        "lang": "en",
+                        "type": "reporter",
+                        "value": "User (https://example.com/~user)",
+                    },
+                    {
+                        "lang": "en",
+                        "type": "coordinator",
+                        "value": "Seth Larson (https://github.com/sethmlarson)",
+                    },
+                ],
+                "providerMetadata": {
+                    "orgId": PSF_CNA_UUID,
+                    "shortName": PSF_CNA_SHORTNAME,
+                    "dateUpdated": cve_isoformat(date_updated),
+                },
+                "references": [
+                    {
+                        "tags": ["issue-tracking"],
+                        "url": "https://github.com/python/cpython/issues/12345",
+                    }
+                ],
+                "source": {
+                    "discovery": "UNKNOWN",
+                },
+                "title": "Test Vulnerability",
+            },
+        },
+    }
+
+
+def _build_cve_references(tags: abc.Iterable[str]) -> abc.Iterator[dict]:
+    for index, tag in enumerate(tags, 1):
+        yield {
+            "tags": [tag],
+            "url": f"https://example.com/python/{tag}/{index:02d}",
+        }
 
 
 def _create_advisory_dict(state, cve_id, collaborating_teams, summary=""):
@@ -425,3 +496,32 @@ def test_only_processes_installations_for_required_org(monkeypatch) -> None:
         app.run()
 
     github.auth.as_installation.assert_called_once_with(2)
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        ["patch"],
+        ["issue-tracking", "patch"],
+        ["third-party-advisory", "patch", "exploit"],
+        [],
+        ["third-party-advisory"],
+        ["issue-tracking", "mailing-list"],
+    ],
+)
+def test_ghsa_closed_on_cve_patch(show_cve_response, tags, cve_id) -> None:
+    show_cve_response["containers"]["cna"]["references"] = list(_build_cve_references(tags))
+    github = mock.Mock()
+    cve_api = mock.Mock()
+    cve_api.show_cve_record.return_value = show_cve_response
+    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
+        get_repo_advs.return_value = [_create_advisory_dict("draft", cve_id, [])]
+        app.apply_to_repo(github, "owner", "repo", cve_api)
+
+    update = github.rest.security_advisories.update_repository_advisory.call_args
+    try:
+        new_state = update.kwargs["data"]["state"]
+    except AttributeError, KeyError:
+        new_state = None
+    check_state = operator.eq if "patch" in tags else operator.ne
+    assert check_state(new_state, "closed")
