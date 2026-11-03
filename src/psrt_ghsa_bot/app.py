@@ -29,15 +29,6 @@ from psrt_ghsa_bot._sentry_monitoring import (
 load_dotenv()
 
 PSRT_GITHUB_TEAM_SLUG = "psrt"
-COMPLETION_TAGS = (
-    "CLOSE",
-    "CLOSED",
-    "COMPLETE",
-    "COMPLETED",
-    "NOTPLANNED",
-    "INVALID",
-    "DUPLICATE",
-)
 
 
 def get_repository_advisories(
@@ -243,26 +234,8 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
             continue
 
         print(f"    📋 Processing {ghsa_id} (state: {state})")
-
-        # If the summary contains a completion tag then we can close the ticket.
-        summary = security_advisory.get("summary", "")
-        if re.search(rf"\[(?:{'|'.join(COMPLETION_TAGS)})\]", summary.upper()) is not None:
-            github.rest.security_advisories.update_repository_advisory(
-                owner=owner,
-                repo=repo,
-                ghsa_id=ghsa_id,
-                data={"state": "closed"},
-            )
-            print(f"       🧹 Closed {ghsa_id}")
-            continue
-
         # Maintain a dictionary of updates to make and then submit them all at once.
         patch_data = {}
-
-        # If the summary contains '[ACCEPT{ED}]' we can move the ticket to draft
-        if state == "triage" and re.search(r"\[ACCEPT(?:ED)?\]", summary.upper()) is not None:
-            patch_data["state"] = state = "draft"
-            print(f"       ✅ Will accept {ghsa_id}")
 
         # Advisories that are in the 'draft' state without a private
         # fork active will have a fork requested.

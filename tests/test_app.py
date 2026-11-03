@@ -263,67 +263,6 @@ def test_create_private_fork() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "summary",
-    [
-        "[CLOSE] perl is better than Python",
-        "[CLOSED] 0.1 + 0.2 is broken?!?!?!?!?!",
-        "[COMPLETE] some boring security thing",
-        "fix soemthing in datetime module [COMPLETED]",
-        "blah blah [closed] lowercase blah",
-        "[NOTPLANNED] no fix planned",
-        "[INVALID] some annoying spam",
-        "[DUPLICATE] we've seen this one before",
-    ],
-)
-def test_closes_advisory_with_completion_tag(summary) -> None:
-    security_advisory = _create_advisory_dict("triage", None, [], summary=summary)
-
-    github = mock.Mock()
-    cve_api = mock.Mock()
-
-    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
-        get_repo_advs.return_value = [security_advisory]
-
-        app.apply_to_repo(github, "owner", "repo", cve_api)
-
-    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
-        owner="owner",
-        repo="repo",
-        ghsa_id="GHSA-xxxx-xxxx-xxxx",
-        data={"state": "closed"},
-    )
-
-
-@pytest.mark.parametrize(
-    "summary",
-    [
-        "[ACCEPT] Python is better than C",
-        "[ACCEPTED] 0.1 + 0.2 is broken?!?!?!?!?!",
-        "fix soemthing in datetime module [ACCEPTED]",
-        "blah blah [accepted] lowercase blah",
-    ],
-)
-def test_accepts_advisory_with_accept_tag(summary, cve_id, cve_reserve_response) -> None:
-    security_advisory = _create_advisory_dict("triage", None, ["psrt"], summary=summary)
-
-    github = mock.Mock()
-    cve_api = mock.Mock()
-    cve_api.reserve.return_value = cve_reserve_response
-
-    with mock.patch("psrt_ghsa_bot.app.get_repository_advisories") as get_repo_advs:
-        get_repo_advs.return_value = [security_advisory]
-
-        app.apply_to_repo(github, "owner", "repo", cve_api)
-
-    github.rest.security_advisories.update_repository_advisory.assert_called_once_with(
-        owner="owner",
-        repo="repo",
-        ghsa_id="GHSA-xxxx-xxxx-xxxx",
-        data={"state": "draft", "cve_id": cve_id},
-    )
-
-
 def test_get_security_advisory_credits_no_private_fork():
     github = mock.Mock()
     credits = app.get_security_advisory_credits(
