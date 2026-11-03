@@ -211,6 +211,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
     """Yield reference URLs in the given CVE with any of the named tags"""
     try:
         cve = cve_api.show_cve_record(cve_id)
+        cve_state = cve["cveMetadata"]["state"]
         cve_refs = cve["containers"]["cna"]["references"]
     except KeyError, RequestFailed, TypeError:
         # If we got a bad response, we can still proceed with other updates.
@@ -219,6 +220,8 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
         # return value for show_cve_record.
         capture_exception()
         return
+    if cve_state != "PUBLISHED":
+        return  # We don't want to act on CVEs that aren't published.
     for ref in cve_refs:
         if tags.intersection(ref.get("tags", ())):
             yield ref["url"]

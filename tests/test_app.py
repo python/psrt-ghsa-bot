@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import json
 from collections import abc
 from unittest import mock
@@ -498,17 +499,23 @@ def test_only_processes_installations_for_required_org(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "tags",
-    [
-        ["patch"],
-        ["issue-tracking", "patch"],
-        ["third-party-advisory", "patch", "exploit"],
-        [],
-        ["third-party-advisory"],
-        ["issue-tracking", "mailing-list"],
-    ],
+    "state,tags",
+    list(
+        itertools.product(
+            ["PUBLISHED", "REJECTED"],
+            [
+                ["patch"],
+                ["issue-tracking", "patch"],
+                ["third-party-advisory", "patch", "exploit"],
+                [],
+                ["third-party-advisory"],
+                ["issue-tracking", "mailing-list"],
+            ],
+        )
+    ),
 )
-def test_ghsa_closed_on_cve_patch(show_cve_response, tags, cve_id) -> None:
+def test_ghsa_closed_when_cve_patch_published(show_cve_response, state, tags, cve_id) -> None:
+    show_cve_response["cveMetadata"]["state"] = state
     show_cve_response["containers"]["cna"]["references"] = list(_build_cve_references(tags))
     github = mock.Mock()
     cve_api = mock.Mock()
@@ -522,7 +529,7 @@ def test_ghsa_closed_on_cve_patch(show_cve_response, tags, cve_id) -> None:
         new_state = update.kwargs["data"]["state"]
     except AttributeError, KeyError:
         new_state = None
-    assert (new_state == "closed") == ("patch" in tags)
+    assert (new_state == "closed") == (state == "PUBLISHED" and "patch" in tags)
 
 
 @pytest.mark.parametrize("state", ["closed", "published", "triage"])
