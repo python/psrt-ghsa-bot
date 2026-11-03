@@ -14,6 +14,7 @@ from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
+from requests.exceptions import RequestException
 
 from psrt_ghsa_bot._sentry_monitoring import (
     MONITOR_SLUG_GHSA,
@@ -213,7 +214,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
         cve = cve_api.show_cve_record(cve_id)
         cve_state = cve["cveMetadata"]["state"]
         cve_refs = cve["containers"]["cna"]["references"]
-    except KeyError, RequestFailed, TypeError:
+    except KeyError, RequestException, TypeError:
         # If we got a bad response, we can still proceed with other updates.
         # Record the failure and continue.
         # Note TypeError covers tests where cve_api is a mock without a
