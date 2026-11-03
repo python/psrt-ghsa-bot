@@ -5,6 +5,7 @@ from collections import abc
 from unittest import mock
 
 import pytest
+import requests.exceptions as req_exc
 
 from psrt_ghsa_bot import app
 
@@ -549,3 +550,20 @@ def test_only_draft_ghsa_closed_on_cve(show_cve_response, state) -> None:
         pass  # We're testing the state didn't change, so no update is good.
     else:
         assert new_state == state
+
+
+@pytest.mark.parametrize(
+    "errcls",
+    [
+        req_exc.RequestException,
+        req_exc.HTTPError,
+        req_exc.ConnectionError,
+        req_exc.ConnectTimeout,
+        req_exc.ReadTimeout,
+    ],
+)
+def test_show_cve_errors_ignored(errcls, cve_id):
+    cve_api = mock.Mock()
+    cve_api.show_cve_record.side_effect = errcls("test error")
+    assert list(app.iter_cve_refs_with_tags(cve_api, cve_id, {"patch"})) == []
+    cve_api.show_cve_record.assert_called()
