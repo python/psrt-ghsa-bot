@@ -207,7 +207,7 @@ def sort_security_advisory_credits(credits: list[dict[str, str]]) -> list[dict[s
     return sorted(credits, key=lambda c: (c["login"], c["type"]))
 
 
-def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: abc.Set) -> abc.Iterator[str]:
+def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc.Iterator[str]:
     """Yield reference URLs in the given CVE with any of the named tags"""
     try:
         cve = cve_api.show_cve_record(cve_id)
@@ -220,8 +220,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: abc.Set) -> abc.
         capture_exception()
         return
     for ref in cve_refs:
-        # Not sure why but abc.Set only defines isdisjoint.
-        if not tags.isdisjoint(ref.get("tags", ())):
+        if tags.intersection(ref.get("tags", ())):
             yield ref["url"]
 
 
