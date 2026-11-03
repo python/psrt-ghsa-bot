@@ -8,6 +8,7 @@ import re
 import time
 import typing
 import urllib.parse
+from collections import abc
 
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
@@ -206,6 +207,26 @@ def sort_security_advisory_credits(credits: list[dict[str, str]]) -> list[dict[s
     return sorted(credits, key=lambda c: (c["login"], c["type"]))
 
 
+def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc.Iterator[str]:
+    """Yield reference URLs in the given CVE with any of the named tags"""
+    try:
+        cve = cve_api.show_cve_record(cve_id)
+        cve_state = cve["cveMetadata"]["state"]
+        cve_refs = cve["containers"]["cna"]["references"]
+    except KeyError, RequestFailed, TypeError:
+        # If we got a bad response, we can still proceed with other updates.
+        # Record the failure and continue.
+        # Note TypeError covers tests where cve_api is a mock without a
+        # return value for show_cve_record.
+        capture_exception()
+        return
+    if cve_state != "PUBLISHED":
+        return  # We don't want to act on CVEs that aren't published.
+    for ref in cve_refs:
+        if tags.intersection(ref.get("tags", ())):
+            yield ref["url"]
+
+
 def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, reserve_cves: bool = True) -> None:
     """Applies the PSRT GitHub Security Advisory process to the repository."""
     security_advisories = get_repository_advisories(github, owner, repo)
@@ -258,12 +279,18 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
                 capture_exception()
                 raise RuntimeError("Request to create a private fork failed") from None
 
-        # Advisories that are in the 'draft' state without a CVE ID
-        # should have one allocated by the PSF CVE Numbering Authority.
-        if reserve_cves and state == "draft" and security_advisory.get("cve_id") is None:
-            cve_id = reserve_one_cve(cve_api)
-            patch_data["cve_id"] = cve_id
-            print(f"       ✅ Will reserve CVE ID: {cve_id}")
+        # Keep draft GHSAs in sync with CVEs:
+        # * If there is no CVE, reserve and associate one.
+        # * If there is a CVE, and it has a patch, close the GHSA.
+        if state == "draft":
+            cve_id = security_advisory.get("cve_id")
+            if cve_id is None and reserve_cves:
+                cve_id = reserve_one_cve(cve_api)
+                patch_data["cve_id"] = cve_id
+                print(f"       ✅ Will reserve CVE ID: {cve_id}")
+            elif cve_id and any(iter_cve_refs_with_tags(cve_api, cve_id, {"patch"})):
+                print(f"       🎉 Will close {ghsa_id}: {cve_id} has a patch")
+                patch_data["state"] = "closed"
 
         collaborating_teams = {team["slug"] for team in security_advisory["collaborating_teams"]}
         if PSRT_GITHUB_TEAM_SLUG not in collaborating_teams:
