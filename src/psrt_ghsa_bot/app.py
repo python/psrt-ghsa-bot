@@ -10,11 +10,13 @@ import typing
 import urllib.parse
 from collections import abc
 
+import sentry_sdk
+
 from cvelib.cve_api import CveApi
 from dotenv import load_dotenv
 from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
-from requests.exceptions import RequestException
+from requests.exceptions import HTTPError, RequestException
 
 from psrt_ghsa_bot._sentry_monitoring import (
     MONITOR_SLUG_GHSA,
@@ -201,17 +203,32 @@ def sort_security_advisory_credits(credits: list[dict[str, str]]) -> list[dict[s
 
 def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc.Iterator[str]:
     """Yield reference URLs in the given CVE with any of the named tags"""
+    # If we get any bad response, we can still proceed with other updates.
+    # Record the failure and return early to let other updates proceed.
     try:
         cve = cve_api.show_cve_record(cve_id)
+    except HTTPError as err:
+        if sentry_sdk.is_initialized():
+            sentry_sdk.logger.warning(
+                "{cve_id} lookup returned {status_code} {reason}",
+                cve_id=cve_id,
+                status_code=err.response.status_code,
+                reason=err.response.reason,
+            )
+        return
+    except RequestException:
+        capture_exception()
+        return
+
+    try:
         cve_state = cve["cveMetadata"]["state"]
         cve_refs = cve["containers"]["cna"]["references"]
-    except KeyError, RequestException, TypeError:
-        # If we got a bad response, we can still proceed with other updates.
-        # Record the failure and continue.
+    except KeyError, TypeError:
         # Note TypeError covers tests where cve_api is a mock without a
         # return value for show_cve_record.
         capture_exception()
         return
+
     if cve_state != "PUBLISHED":
         return  # We don't want to act on CVEs that aren't published.
     for ref in cve_refs:
