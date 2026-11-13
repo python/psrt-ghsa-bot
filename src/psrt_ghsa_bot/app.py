@@ -24,7 +24,6 @@ from psrt_ghsa_bot._sentry_monitoring import (
     STATUS_IN_PROGRESS,
     STATUS_OK,
     capture_checkin,
-    capture_exception,
     init_sentry,
 )
 
@@ -87,7 +86,7 @@ def get_repository_advisories(
             return
         # Capture the original exception in Sentry (private)
         # and emit a sanitized public exception.
-        capture_exception()
+        sentry_sdk.capture_exception()
         raise RuntimeError("Request to paginate advisories failed.")
 
 
@@ -136,7 +135,7 @@ def get_security_advisory_credits(
                 print(f"       ⚠️  Pull requests not found for {private_fork_owner}/{private_fork_repo}!")
                 pull_requests = []
             else:
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to list pull requests failed") from None
 
         for pull_request in pull_requests:
@@ -158,7 +157,7 @@ def get_security_advisory_credits(
                         f"       ⚠️  Reviews not found for {private_fork_owner}/{private_fork_repo}#{pull_request['number']}!"
                     )
                     continue
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to list pull requests reviews failed") from None
 
             for review in reviews:
@@ -217,7 +216,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
             )
         return
     except RequestException:
-        capture_exception()
+        sentry_sdk.capture_exception()
         return
 
     try:
@@ -226,7 +225,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
     except KeyError, TypeError:
         # Note TypeError covers tests where cve_api is a mock without a
         # return value for show_cve_record.
-        capture_exception()
+        sentry_sdk.capture_exception()
         return
 
     if cve_state != "PUBLISHED":
@@ -267,7 +266,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
             except RequestFailed:
                 # Capture the original exception in Sentry (private)
                 # and emit a sanitized public exception.
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to create a private fork failed") from None
 
         # Keep draft GHSAs in sync with CVEs:
@@ -308,7 +307,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
             except RequestFailed:
                 # Capture the original exception in Sentry (private)
                 # and emit a sanitized public exception.
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to update advisory failed") from None
             print("       💾 Updated advisory")
         else:

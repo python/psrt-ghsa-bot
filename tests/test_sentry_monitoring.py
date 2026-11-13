@@ -5,31 +5,20 @@ import pytest
 from psrt_ghsa_bot import _sentry_monitoring as sm
 from psrt_ghsa_bot import app
 
-DSN = "https://public@o0.ingest.sentry.io/0"
 
-
-def test_noop_without_dsn(monkeypatch) -> None:
-    monkeypatch.delenv("SENTRY_DSN", raising=False)
-    with mock.patch.object(sm.sentry_sdk, "init") as init:
-        sm.init_sentry()
-    init.assert_not_called()
-
-    with mock.patch.object(sm.crons, "capture_checkin") as capture:
-        result = sm.capture_checkin(sm.MONITOR_SLUG_GHSA, sm.STATUS_OK)
-    assert result is None
-    capture.assert_not_called()
-
-
-def test_init_with_dsn(monkeypatch) -> None:
-    monkeypatch.setenv("SENTRY_DSN", DSN)
+@pytest.mark.parametrize("dsn", [None, "https://public@o0.ingest.sentry.io/0"])
+def test_init_with_dsn(monkeypatch, dsn) -> None:
+    if dsn:
+        monkeypatch.setenv("SENTRY_DSN", dsn)
+    else:
+        monkeypatch.delenv("SENTRY_DSN", raising=False)
     with mock.patch.object(sm.sentry_sdk, "init") as init:
         sm.init_sentry()
     init.assert_called_once()
-    assert init.call_args.kwargs["dsn"] == DSN
+    assert init.call_args.kwargs["dsn"] == dsn
 
 
-def test_capture_checkin_with_dsn(monkeypatch) -> None:
-    monkeypatch.setenv("SENTRY_DSN", DSN)
+def test_capture_checkin(monkeypatch) -> None:
     with mock.patch.object(sm.crons, "capture_checkin", return_value="stanstan") as capture:
         result = sm.capture_checkin(sm.MONITOR_SLUG_GHSA, sm.STATUS_OK, duration=1.5, check_in_id="stanstan")
     assert result == "stanstan"
@@ -42,7 +31,6 @@ def test_capture_checkin_with_dsn(monkeypatch) -> None:
 
 
 def test_capture_checkin_swallow_sdk_errors(monkeypatch) -> None:
-    monkeypatch.setenv("SENTRY_DSN", DSN)
     with mock.patch.object(sm.crons, "capture_checkin", side_effect=AttributeError):
         assert sm.capture_checkin(sm.MONITOR_SLUG_GHSA, sm.STATUS_OK) is None
 
