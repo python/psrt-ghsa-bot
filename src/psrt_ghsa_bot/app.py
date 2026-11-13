@@ -5,7 +5,6 @@ import datetime
 import json
 import os
 import re
-import time
 import typing
 import urllib.parse
 from collections import abc
@@ -18,15 +17,7 @@ from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
 from requests.exceptions import HTTPError, RequestException
 
-from psrt_ghsa_bot._sentry_monitoring import (
-    MONITOR_SLUG_GHSA,
-    STATUS_ERROR,
-    STATUS_IN_PROGRESS,
-    STATUS_OK,
-    capture_checkin,
-    capture_exception,
-    init_sentry,
-)
+from psrt_ghsa_bot._sentry_monitoring import cron, init_sentry
 
 load_dotenv()
 
@@ -87,7 +78,7 @@ def get_repository_advisories(
             return
         # Capture the original exception in Sentry (private)
         # and emit a sanitized public exception.
-        capture_exception()
+        sentry_sdk.capture_exception()
         raise RuntimeError("Request to paginate advisories failed.")
 
 
@@ -136,7 +127,7 @@ def get_security_advisory_credits(
                 print(f"       ⚠️  Pull requests not found for {private_fork_owner}/{private_fork_repo}!")
                 pull_requests = []
             else:
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to list pull requests failed") from None
 
         for pull_request in pull_requests:
@@ -158,7 +149,7 @@ def get_security_advisory_credits(
                         f"       ⚠️  Reviews not found for {private_fork_owner}/{private_fork_repo}#{pull_request['number']}!"
                     )
                     continue
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to list pull requests reviews failed") from None
 
             for review in reviews:
@@ -208,16 +199,15 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
     try:
         cve = cve_api.show_cve_record(cve_id)
     except HTTPError as err:
-        if sentry_sdk.is_initialized():
-            sentry_sdk.logger.warning(
-                "{cve_id} lookup returned {status_code} {reason}",
-                cve_id=cve_id,
-                status_code=err.response.status_code,
-                reason=err.response.reason,
-            )
+        sentry_sdk.logger.warning(
+            "{cve_id} lookup returned {status_code} {reason}",
+            cve_id=cve_id,
+            status_code=err.response.status_code,
+            reason=err.response.reason,
+        )
         return
     except RequestException:
-        capture_exception()
+        sentry_sdk.capture_exception()
         return
 
     try:
@@ -226,7 +216,7 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
     except KeyError, TypeError:
         # Note TypeError covers tests where cve_api is a mock without a
         # return value for show_cve_record.
-        capture_exception()
+        sentry_sdk.capture_exception()
         return
 
     if cve_state != "PUBLISHED":
@@ -267,7 +257,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
             except RequestFailed:
                 # Capture the original exception in Sentry (private)
                 # and emit a sanitized public exception.
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to create a private fork failed") from None
 
         # Keep draft GHSAs in sync with CVEs:
@@ -308,7 +298,7 @@ def apply_to_repo(github: GitHub, owner: str, repo: str, cve_api: CveApi, *, res
             except RequestFailed:
                 # Capture the original exception in Sentry (private)
                 # and emit a sanitized public exception.
-                capture_exception()
+                sentry_sdk.capture_exception()
                 raise RuntimeError("Request to update advisory failed") from None
             print("       💾 Updated advisory")
         else:
@@ -377,16 +367,8 @@ def run() -> None:
 def main() -> None:
     # Report the cron run to Sentry so we're alerted if it fails or stops running.
     init_sentry()
-    check_in_id = capture_checkin(MONITOR_SLUG_GHSA, STATUS_IN_PROGRESS)
-    start_time = time.monotonic()
-    try:
+    with cron():
         run()
-    except Exception:
-        capture_checkin(
-            MONITOR_SLUG_GHSA, STATUS_ERROR, duration=time.monotonic() - start_time, check_in_id=check_in_id
-        )
-        raise
-    capture_checkin(MONITOR_SLUG_GHSA, STATUS_OK, duration=time.monotonic() - start_time, check_in_id=check_in_id)
 
 
 if __name__ == "__main__":
