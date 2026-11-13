@@ -5,7 +5,6 @@ import datetime
 import json
 import os
 import re
-import time
 import typing
 import urllib.parse
 from collections import abc
@@ -18,14 +17,7 @@ from githubkit import AppAuthStrategy, GitHub
 from githubkit.exception import RequestFailed, RequestError
 from requests.exceptions import HTTPError, RequestException
 
-from psrt_ghsa_bot._sentry_monitoring import (
-    MONITOR_SLUG_GHSA,
-    STATUS_ERROR,
-    STATUS_IN_PROGRESS,
-    STATUS_OK,
-    capture_checkin,
-    init_sentry,
-)
+from psrt_ghsa_bot._sentry_monitoring import cron, init_sentry
 
 load_dotenv()
 
@@ -375,16 +367,8 @@ def run() -> None:
 def main() -> None:
     # Report the cron run to Sentry so we're alerted if it fails or stops running.
     init_sentry()
-    check_in_id = capture_checkin(MONITOR_SLUG_GHSA, STATUS_IN_PROGRESS)
-    start_time = time.monotonic()
-    try:
+    with cron():
         run()
-    except Exception:
-        capture_checkin(
-            MONITOR_SLUG_GHSA, STATUS_ERROR, duration=time.monotonic() - start_time, check_in_id=check_in_id
-        )
-        raise
-    capture_checkin(MONITOR_SLUG_GHSA, STATUS_OK, duration=time.monotonic() - start_time, check_in_id=check_in_id)
 
 
 if __name__ == "__main__":
