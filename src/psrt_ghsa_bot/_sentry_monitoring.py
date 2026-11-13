@@ -14,12 +14,10 @@ STATUS_ERROR = "error"
 
 def init_sentry() -> None:
     """Initialize the Sentry SDK with the DSN from the env"""
-    dsn = os.environ.get("SENTRY_DSN")
-    if not dsn:
+    if dsn := os.environ.get("SENTRY_DSN"):
+        print("Initializing Sentry monitoring")
+    else:
         print("No SENTRY_DSN set, skipping Sentry monitoring")
-        return
-
-    print("Initializing Sentry monitoring")
     sentry_sdk.init(
         dsn=dsn,
         enable_tracing=False,
@@ -28,9 +26,6 @@ def init_sentry() -> None:
 
 def capture_checkin(monitor_slug, status, duration=None, check_in_id=None) -> None | str:
     """Capture a Sentry cron check-in."""
-    if not os.environ.get("SENTRY_DSN"):
-        return None
-
     try:
         return crons.capture_checkin(
             monitor_slug=monitor_slug,
@@ -40,10 +35,3 @@ def capture_checkin(monitor_slug, status, duration=None, check_in_id=None) -> No
         )
     except ImportError, AttributeError:
         return None
-
-
-def capture_exception() -> None:
-    """Capture an exception if Sentry is active."""
-    if not os.environ.get("SENTRY_DSN"):
-        return
-    sentry_sdk.capture_exception()
