@@ -207,13 +207,12 @@ def iter_cve_refs_with_tags(cve_api: CveApi, cve_id: str, tags: set[str]) -> abc
     try:
         cve = cve_api.show_cve_record(cve_id)
     except HTTPError as err:
-        if sentry_sdk.is_initialized():
-            sentry_sdk.logger.warning(
-                "{cve_id} lookup returned {status_code} {reason}",
-                cve_id=cve_id,
-                status_code=err.response.status_code,
-                reason=err.response.reason,
-            )
+        sentry_sdk.logger.warning(
+            "{cve_id} lookup returned {status_code} {reason}",
+            cve_id=cve_id,
+            status_code=err.response.status_code,
+            reason=err.response.reason,
+        )
         return
     except RequestException:
         sentry_sdk.capture_exception()
