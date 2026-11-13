@@ -1,6 +1,8 @@
 """Sentry cron monitoring integration for the PSRT GHSA bot."""
 
+import contextlib
 import os
+import time
 
 import sentry_sdk
 from sentry_sdk import crons
@@ -24,14 +26,29 @@ def init_sentry() -> None:
     )
 
 
-def capture_checkin(monitor_slug, status, duration=None, check_in_id=None) -> None | str:
-    """Capture a Sentry cron check-in."""
+@contextlib.contextmanager
+def cron():
+    start_time = time.monotonic()
     try:
-        return crons.capture_checkin(
-            monitor_slug=monitor_slug,
-            status=status,
-            duration=duration,
-            check_in_id=check_in_id,
+        check_in_id = crons.capture_checkin(
+            monitor_slug=MONITOR_SLUG_GHSA,
+            status=STATUS_IN_PROGRESS,
         )
     except ImportError, AttributeError:
-        return None
+        check_in_id = None
+    try:
+        yield
+    except Exception:
+        sentry_sdk.capture_exception()
+        status = STATUS_ERROR
+        raise
+    else:
+        status = STATUS_OK
+    finally:
+        if check_in_id is not None:
+            crons.capture_checkin(
+                monitor_slug=MONITOR_SLUG_GHSA,
+                status=status,
+                duration=time.monotonic() - start_time,
+                check_in_id=check_in_id,
+            )
