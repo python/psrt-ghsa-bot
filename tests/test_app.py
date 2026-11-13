@@ -5,6 +5,7 @@ from collections import abc
 from unittest import mock
 
 import pytest
+import requests
 import requests.exceptions as req_exc
 
 from psrt_ghsa_bot import app
@@ -495,7 +496,6 @@ def test_only_draft_ghsa_closed_on_cve(show_cve_response, state) -> None:
     "errcls",
     [
         req_exc.RequestException,
-        req_exc.HTTPError,
         req_exc.ConnectionError,
         req_exc.ConnectTimeout,
         req_exc.ReadTimeout,
@@ -506,3 +506,19 @@ def test_show_cve_errors_ignored(errcls, cve_id):
     cve_api.show_cve_record.side_effect = errcls("test error")
     assert list(app.iter_cve_refs_with_tags(cve_api, cve_id, {"patch"})) == []
     cve_api.show_cve_record.assert_called()
+
+
+@pytest.mark.parametrize("code", ["bad_request", "internal_server_error"])
+def test_show_cve_bad_responses_logged(code, cve_id):
+    response = requests.Response()
+    response.status_code = requests.codes[code]
+    response.reason = code.replace("_", " ").title()
+    cve_api = mock.Mock()
+    cve_api.show_cve_record.side_effect = req_exc.HTTPError(response=response)
+    with mock.patch("sentry_sdk.logger.warning") as logger:
+        assert list(app.iter_cve_refs_with_tags(cve_api, cve_id, {"patch"})) == []
+    cve_api.show_cve_record.assert_called()
+    assert logger.call_args is not None
+    log_kwargs = logger.call_args.kwargs
+    assert log_kwargs.get("status_code") == response.status_code
+    assert log_kwargs.get("reason") == response.reason
