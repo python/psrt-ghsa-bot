@@ -6,7 +6,7 @@ from psrt_ghsa_bot import _sentry_monitoring as sm
 from psrt_ghsa_bot import app
 
 
-@pytest.mark.parametrize("dsn", [None, "https://public@o0.ingest.sentry.io/0"])
+@pytest.mark.parametrize("dsn", [None, "https://public@o0.ingest.sentry.example/0"])
 def test_init_with_dsn(monkeypatch, dsn) -> None:
     if dsn:
         monkeypatch.setenv("SENTRY_DSN", dsn)
